@@ -58,7 +58,7 @@ export const STYLES = [
   // group 3: the most colour, blacks lifted, shadows leaning teal
   { id: "vivid", name: "花期", note: "顏色最濃、黑位抬高、暗部帶青", params: {
       ref_tc: [0.0138, 0.0319, 0.0466, 0.0699, 0.0886, 0.1006, 0.0881, 0.0708, 0.0533, 0.0369], max_colour_gain: 1.65, black_floor: 0.16, toe_keep: 0.7,
-      white_cap: 0.95, mid_contrast: 0.0, density: 0.10, warm_sh: [-0.010, 0.004], warm_mid: [0.006, 0.006], warm_hi: [0.002, 0.010],
+      white_cap: 0.95, mid_contrast: 0.0, density: 0.10, warm_sh: [-0.008, -0.003], warm_mid: [0.006, 0.006], warm_hi: [0.002, 0.010],
       hue: { green: -4, yellow_green: -3, yellow: -2, sky: -4, blue: -4, cyan: -3 },
       sat: { pink: 0.25, red: 0.22, orange: 0.18, yellow: 0.30, yellow_green: 0.30, green: 0.30, teal: 0.30, cyan: 0.34, sky: 0.30, blue: 0.20, violet: 0.20, purple: 0.25 } } },
 ];
@@ -169,14 +169,14 @@ export function plan(an, strength, p = P) {
   // a photo that is mostly bright (snow, white rooms) keeps its whites closer to white, and takes half the tint:
   // a tinted highlight is a mood on a small window, but a colour cast on a field of snow
   const bright = (an.zone_share?.[8] || 0) + (an.zone_share?.[9] || 0), mostlyBright = clamp((bright - 0.15) / 0.3, 0, 1);
-  const keep = clamp(1 - Math.hypot(an.cast[0], an.cast[1]) / 0.035, 0.25, 1.0) * Math.min(s, 1.25) / Math.max(s, 1e-6) * (1 - 0.5 * mostlyBright);
+  const keep = clamp(1 - Math.hypot(an.cast[0], an.cast[1]) / 0.035, 0.25, 1.0) * Math.min(s, 1.25) / Math.max(s, 1e-6);
   // pull: how far pure white is brought down. Never more than 0.08, whatever the style or strength.
   const pull = Math.min(Math.min(s, 1.6) * (1 - p.white_cap) * (1 - 0.6 * mostlyBright), 0.08);
   // The shoulder is L - pull * t^2 over [knee, 1]; its slope at white is 1 - 2 * pull / (1 - knee). Starting the
   // shoulder early enough (span >= 4 * pull) keeps that slope >= 0.5, so tones can never fold back on themselves.
   const knee = 1 - Math.max(1 - p.knee, 4 * pull);
   // over: the shoulder is active. pulls: the photo's white point really ends up lower (what the interface reports).
-  return { lift, need, keep, over: an.p_white > knee, pulls: an.p_white > knee && an.p_white > 1 - pull, cap: 1 - pull, knee, bw: an.bw };
+  return { lift, need, keep, tintShare: 1 - 0.5 * mostlyBright, over: an.p_white > knee, pulls: an.p_white > knee && an.p_white > 1 - pull, cap: 1 - pull, knee, bw: an.bw };
 }
 
 // Apply the look in place. Returns { analysis, plan }.
@@ -186,7 +186,7 @@ export function render(rgba, w, h, strength = STANDARD_STRENGTH, opts = {}) {
   const p = opts.params || paramsFor(opts.style), s = strength;
   const an = opts.analysis || analyse(rgba, w, h); const pl = plan(an, s, p);
   const [bt, bb, bl, br] = an.box; const { lift, need, keep, over, cap, knee } = pl; const drop = 1 - cap, kspan = 1 - knee;
-  const sCap = Math.min(s, 2);                          // contrast and hue moves stop growing here; colour amount goes on to 3
+  const sCap = Math.min(s, 2);                          // contrast, hue turns and per-family amounts stop growing here; the colour fill goes on to 3
   const contrast = sCap * p.mid_contrast * clamp(lift / 0.04, 0, 1);      // only to win back contrast lost to a lifted toe
   // hue tables: 12 soft colour families, interpolated per degree
   const hp = p.hue;
@@ -227,11 +227,11 @@ export function render(rgba, w, h, strength = STANDARD_STRENGTH, opts = {}) {
         // per colour family: how much of it the style keeps, and where it is turned to. Skin is mostly spared.
         const hi = h_ | 0, hf = h_ - hi;
         const more = DC[hi] + hf * (DC[hi + 1] - DC[hi]);
-        C1 *= 1 + sCap * more * (1 - 0.9 * skin) * ss(C, 0.015, 0.05) * (more > 0 ? (1 - 0.85 * ss(C, 0.09, 0.2)) * (1 - ss(C / Math.max(L1, 0.05), 0.25, 0.45)) : 1);   // and none to colours already near the screen's limit for their brightness
+        C1 *= 1 + sCap * more * (1 - 0.9 * skin) * ss(C, 0.015, 0.05) * (more > 0 ? (1 - ss(C1, 0.07, 0.16)) * (1 - ss(C1 / Math.max(L1, 0.05), 0.25, 0.45)) : 1);   // and none to colours already near the screen's limit for their brightness
         const gate = ss(C1, 0.02, 0.06);
-        const h1 = (h_ + sCap * gate * (DH[hi] + hf * (DH[hi + 1] - DH[hi]))) * D2R; L1 += sCap * gate * ss(L1, 0.15, 0.4) * (DL[hi] + hf * (DL[hi + 1] - DL[hi]));   // deepening greens and blues is for mid-tones up, not for shadows
+        const h1 = (h_ + sCap * gate * (1 - 0.7 * skin) * (DH[hi] + hf * (DH[hi + 1] - DH[hi]))) * D2R; L1 += sCap * gate * ss(L1, 0.15, 0.4) * (DL[hi] + hf * (DL[hi + 1] - DL[hi]));   // deepening greens and blues is for mid-tones up, not for shadows
         // split tone relative to the photo's own balance
-        const wHi = ss(L1, 0.55, 0.85) * (1 - 0.85 * ss(L1, 0.88, 0.98)) * (1 - ss(L, 0.9, 0.99)), wSh = 1 - ss(L1, 0.15, 0.5), wMid = ss(L1, 0.2, 0.45) * (1 - ss(L1, 0.6, 0.85)), k = s * keep * (1 - 0.85 * skin * ss(C, 0.02, 0.05));   // the cream tint fades out before white, and mostly spares skin
+        const wHi = ss(L1, 0.55, 0.85) * (1 - 0.85 * ss(L1, 0.88, 0.98)) * (1 - ss(L, 0.9, 0.99)), wSh = 1 - ss(L1, 0.15, 0.5), wMid = ss(L1, 0.2, 0.45) * (1 - ss(L1, 0.6, 0.85)), k = s * keep * pl.tintShare * (1 - 0.85 * skin * ss(C, 0.02, 0.05));   // the cream tint fades out before white, and mostly spares skin
         a = C1 * Math.cos(h1) + k * (p.warm_hi[0] * wHi + p.warm_mid[0] * wMid + p.warm_sh[0] * wSh); b = C1 * Math.sin(h1) + k * (p.warm_hi[1] * wHi + p.warm_mid[1] * wMid + p.warm_sh[1] * wSh);
       }
       // deep shadows (L < 0.18) are never pushed darker than they were, and the guard eases off by L 0.38:
