@@ -20,23 +20,23 @@ export const P = {
 // how much colour that group carries per lightness zone (ref_tc), where its whites and blacks sit,
 // its overall key, and the tint of its highlights and shadows. "classic" is the broad house look.
 export const STYLES = [
-  { id: "classic", name: "經典", note: "最接近參考照片的整體樣貌", params: {} },
-  { id: "calm", name: "冷靜低彩", note: "顏色收斂、接近中性", params: {
+  { id: "classic", name: "相紙", note: "最接近參考照片的整體樣貌", params: {} },
+  { id: "calm", name: "薄霧", note: "顏色收斂、接近中性", params: {
       ref_tc: [0.0163, 0.0154, 0.024, 0.0358, 0.0417, 0.0441, 0.0405, 0.0352, 0.0285, 0.0167], min_colour_gain: 0.82, white_cap: 0.96,
       warm_hi: [0.0003, 0.003], warm_sh: [-0.001, 0.001], hi_desat: 0.36, density: 0.11 } },
-  { id: "daylight", name: "明亮日光", note: "整體提亮，暗部帶暖、亮部乾淨", params: {
+  { id: "daylight", name: "正午", note: "整體提亮，暗部帶暖、亮部乾淨", params: {
       ref_tc: [0.0159, 0.0235, 0.0353, 0.0474, 0.0561, 0.0639, 0.058, 0.051, 0.0393, 0.0179], key: 0.28, white_cap: 0.98, black_floor: 0.10,
       warm_hi: [-0.001, 0.004], warm_sh: [0.001, 0.008], hue: { green: -7, yellow_green: -6, yellow: -3, sky: -6, blue: -5, cyan: -2 } } },
-  { id: "amber", name: "濃郁琥珀", note: "中間調偏橘黃，像夕陽或暖燈下", params: {
+  { id: "amber", name: "琥珀", note: "中間調偏橘黃，像夕陽或暖燈下", params: {
       ref_tc: [0.0147, 0.0193, 0.0257, 0.0532, 0.0726, 0.0821, 0.0783, 0.0802, 0.0621, 0.0285], key: -0.28, white_cap: 0.95, max_colour_gain: 1.55,
       warm_hi: [0.002, 0.008], warm_sh: [0.0045, 0.0045], hi_desat: 0.1, density: 0.17 } },
-  { id: "warmlight", name: "暗底暖高光", note: "畫面壓暗，亮部保留暖色", params: {
+  { id: "warmlight", name: "燭火", note: "畫面壓暗，亮部保留暖色", params: {
       ref_tc: [0.0196, 0.023, 0.0342, 0.0458, 0.0622, 0.0684, 0.0623, 0.0696, 0.0619, 0.0383], key: -0.3, white_cap: 0.95,
       warm_hi: [0.002, 0.009], warm_sh: [0.0, 0.002], hi_desat: 0.08, density: 0.16 } },
-  { id: "lowkey", name: "低調暗沉", note: "整體很暗，高光壓得最低", params: {
+  { id: "lowkey", name: "深夜", note: "整體很暗，高光壓得最低", params: {
       ref_tc: [0.0102, 0.0162, 0.0327, 0.0477, 0.0584, 0.0671, 0.0671, 0.0492, 0.0298, 0.0184], key: -0.45, white_cap: 0.94, black_floor: 0.06,
       warm_hi: [0.002, 0.005], warm_sh: [0.002, 0.005], density: 0.17 } },
-  { id: "vivid", name: "高彩淺底", note: "顏色最濃、黑位抬高、對比最低", params: {
+  { id: "vivid", name: "花期", note: "顏色最濃、黑位抬高、對比最低", params: {
       ref_tc: [0.0138, 0.0319, 0.0466, 0.0699, 0.0886, 0.1006, 0.0881, 0.0708, 0.0533, 0.0369], max_colour_gain: 1.65, black_floor: 0.16, toe_keep: 0.7,
       white_cap: 0.95, mid_contrast: 0.0, density: 0.10, warm_hi: [0.002, 0.006], warm_sh: [-0.002, 0.004] } },
 ];
@@ -136,7 +136,9 @@ export function analyse(rgba, w, h, box = contentBox(rgba, w, h)) {
 // What the look will do to this photo at a given strength (shown in the interface, used by render).
 export function plan(an, strength, p = P) {
   const s = strength;
-  const lift = s * p.toe_keep * Math.max(p.black_floor - an.p_black, 0);
+  // a photo that is mostly dark (night, a dim cabin) gets less of the lift: raising that much black reads as haze
+  const dark = (an.zone_share?.[0] || 0) + (an.zone_share?.[1] || 0);
+  const lift = Math.min(s * p.toe_keep, 1) * Math.max(p.black_floor - an.p_black, 0) * (1 - 0.6 * clamp((dark - 0.35) / 0.35, 0, 1));   // never lifts past the floor itself
   // highlights (zones 8-9) may only gain a little colour: a faint cast in snow or a white wall is not "missing colour"
   const raw = p.ref_tc.map((r, i) => clamp(r / Math.max(an.tc[i], 0.003), p.min_colour_gain, i >= 8 ? Math.min(p.max_colour_gain, p.hi_gain_limit) : p.max_colour_gain));
   const need = raw.map((v, i) => 0.25 * raw[Math.max(i - 1, 0)] + 0.5 * v + 0.25 * raw[Math.min(i + 1, 9)]);
@@ -158,7 +160,7 @@ export function render(rgba, w, h, strength = 1.5, opts = {}) {
   const p = opts.params || paramsFor(opts.style), s = strength;
   const an = opts.analysis || analyse(rgba, w, h); const pl = plan(an, s, p);
   const [bt, bb, bl, br] = an.box; const { lift, need, keep, over, cap, knee } = pl; const drop = 1 - cap, kspan = 1 - knee;
-  const contrast = s * p.mid_contrast * clamp(lift / 0.04, 0, 1);      // only to win back contrast lost to a lifted toe
+  const contrast = Math.min(s, 2) * p.mid_contrast * clamp(lift / 0.04, 0, 1);      // only to win back contrast lost to a lifted toe
   // hue tables: 12 soft colour families, interpolated per degree
   const hp = p.hue;
   const dh = [0, 0, 0, hp.yellow, hp.yellow_green, hp.green, hp.green * 0.5, hp.cyan, hp.sky, hp.blue, 0, 0];
@@ -190,15 +192,16 @@ export function render(rgba, w, h, strength = 1.5, opts = {}) {
           gain = 1 + (gain - 1) * (1 - ss(C, 0.07, 0.16)) * ss(C, 0.015, 0.05);
           gain = 1 + (gain - 1) * (1 - 0.8 * skin); gain = Math.min(gain, 1.0 + 0.7 * (1 - skin) + (p.skin_gain_limit - 1) * skin);
         } else {
-          gain = 1 + (gain - 1) * (1 - 0.5 * skin);                               // a quieter style takes colour off everything, skin a little less
+          gain = Math.max(1 + (gain - 1) * (1 - 0.5 * skin), 0.2);                               // a quieter style takes colour off everything, skin a little less
         }
-        let C1 = C * gain * (1 - s * p.hi_desat * ss(L1, 0.8, 0.97));
+        let C1 = C * gain * (1 - Math.min(s * p.hi_desat, 0.75) * ss(L1, 0.8, 0.97));
         L1 -= dens * Math.max(C1 - 0.035, 0) * ss(L1, 0.25, 0.55) * (1 - 0.6 * ss(h_, 35, 60) * (1 - ss(h_, 75, 95)));
         // hue: olive greens, cyan-leaning blues, golden yellows
         const hi = h_ | 0, hf = h_ - hi, gate = ss(C1, 0.02, 0.06);
-        const h1 = (h_ + s * gate * (DH[hi] + hf * (DH[hi + 1] - DH[hi]))) * D2R; L1 += s * gate * (DL[hi] + hf * (DL[hi + 1] - DL[hi]));
+        const sh = Math.min(s, 2);                                   // hue moves stop growing at twice the base amount
+        const h1 = (h_ + sh * gate * (DH[hi] + hf * (DH[hi + 1] - DH[hi]))) * D2R; L1 += sh * gate * (DL[hi] + hf * (DL[hi + 1] - DL[hi]));
         // split tone relative to the photo's own balance
-        const wHi = ss(L1, 0.55, 0.85) * (1 - 0.85 * ss(L1, 0.88, 0.98)), wSh = 1 - ss(L1, 0.15, 0.5), k = s * keep * (1 - 0.7 * skin);   // the cream tint fades out before white, and mostly spares skin
+        const wHi = ss(L1, 0.55, 0.85) * (1 - 0.85 * ss(L1, 0.88, 0.98)), wSh = 1 - ss(L1, 0.15, 0.5), k = s * keep * (1 - 0.7 * skin * ss(C, 0.02, 0.05));   // the cream tint fades out before white, and mostly spares skin
         a = C1 * Math.cos(h1) + k * (p.warm_hi[0] * wHi + p.warm_sh[0] * wSh); b = C1 * Math.sin(h1) + k * (p.warm_hi[1] * wHi + p.warm_sh[1] * wSh);
       }
       // deep shadows (L < 0.18) are never pushed darker than they were, and the guard eases off by L 0.38:

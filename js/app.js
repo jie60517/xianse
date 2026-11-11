@@ -6,7 +6,12 @@ const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "modu
 const FX_LABELS = { grain: "顆粒", diffusion: "柔焦", halation: "高光紅暈", texture: "紋理", dust: "灰塵與刮痕", vignette: "暗角" };
 const state = { name: "", loaded: false, style: "classic", seed: 1, busy: false, pending: false, nextId: 0, fxDefaults: null, pos: 50, analysis: null, plan: null };
 const after = $("after"), before = $("before"), viewer = $("viewer"), easel = $("easel");
-const BORDER = 22;                                           // white print border around the photo, px
+const BORDER = 22;
+// The slider runs 0-200 with 100 as the standard amount; the engine's own scale has the standard at 1.5.
+const STRENGTH_UNIT = 0.015;
+const strength = () => +$("strength").value * STRENGTH_UNIT;
+// Film-texture defaults that differ from the effects module's own: no soft-focus blur unless asked for.
+const FX_START = { diffusion: 0 };                                           // white print border around the photo, px
 
 // ---------- loading ----------
 function load(file) {
@@ -31,7 +36,7 @@ for (const b of document.querySelectorAll(".walls button")) b.addEventListener("
 function settings() {
   const fx = {};
   if (state.fxDefaults) for (const k of Object.keys(FX_LABELS)) { const el = $("fx_" + k); if (el) fx[k] = $("fxOn").checked ? +el.value : 0; }
-  return { strength: +$("strength").value, style: state.style, fx: state.fxDefaults ? fx : null, seed: state.seed };
+  return { strength: strength(), style: state.style, fx: state.fxDefaults ? fx : null, seed: state.seed };
 }
 // draft = true while a slider is being dragged: a small, fast render that keeps up with the hand.
 // The full-size preview follows when the slider is released.
@@ -41,8 +46,8 @@ function requestPreview(draft = false) {
   state.busy = true; if (!draft) $("print").dataset.busy = "";
   worker.postMessage({ type: "preview", id: ++state.nextId, draft, ...settings() });
 }
-const requestThumbs = () => state.loaded && worker.postMessage({ type: "thumbs", strength: +$("strength").value });
-$("strength").addEventListener("input", (e) => { $("strengthOut").textContent = String(+(+e.target.value).toFixed(2)); requestPreview(true); });
+const requestThumbs = () => state.loaded && worker.postMessage({ type: "thumbs", strength: strength() });
+$("strength").addEventListener("input", (e) => { $("strengthOut").textContent = String(Math.round(+e.target.value)); requestPreview(true); });
 $("strength").addEventListener("change", () => { requestPreview(); requestThumbs(); });
 $("fxOn").addEventListener("change", () => { $("fxGroup").classList.toggle("fx-off", !$("fxOn").checked); requestPreview(); });
 $("reseed").addEventListener("click", () => { state.seed = (state.seed * 7919 + 13) % 100000; requestPreview(); });
@@ -56,7 +61,7 @@ function buildFxSliders(defaults) {
     const row = document.createElement("div"); row.className = "fx-row";
     row.innerHTML = `<div class="row"><label for="fx_${k}">${label}</label><output id="fxo_${k}"></output></div><input type="range" id="fx_${k}" min="0" max="1" step="0.05">`;
     box.append(row); const el = row.querySelector("input"), out = row.querySelector("output");
-    el.value = defaults[k]; out.textContent = (+el.value).toFixed(2); trackFill(el);
+    el.value = k in FX_START ? FX_START[k] : defaults[k]; out.textContent = (+el.value).toFixed(2); trackFill(el);
     el.addEventListener("input", () => { out.textContent = (+el.value).toFixed(2); requestPreview(true); });
     el.addEventListener("change", () => requestPreview());
   }
@@ -108,7 +113,7 @@ function showReadout() {
   const an = state.analysis, plan = state.plan; if (!an || !plan) return;
   const rows = [];
   rows.push(["最暗點", `<b>${pct(an.p_black)}%</b>　${plan.lift > 0.002 ? `稍微鬆開 <b>+${(plan.lift * 100).toFixed(1)}</b>` : "夠了，不動"}`]);
-  rows.push(["最亮點", `<b>${pct(an.p_white)}%</b>　${plan.over ? `收斂到 <b>${pct(plan.cap)}%</b> 以下` : "沒有過亮，不動"}`]);
+  rows.push(["最亮點", `<b>${pct(an.p_white)}%</b>　${plan.over && an.p_white > plan.cap ? `收斂到 <b>${pct(plan.cap)}%</b> 以下` : "沒有過亮，不動"}`]);
   if (plan.bw) rows.push(["顏色", "黑白照片，只調明暗"]);
   else {
     const up = plan.need.filter((g) => g > 1.03).length, down = plan.need.filter((g) => g < 0.97).length;
@@ -133,7 +138,7 @@ function showReadout() {
   const st = STYLES.find((s) => s.id === state.style);
   $("labelTitle").innerHTML = `${st.name}<span>${st.note}</span>`;
   $("labelFile").textContent = `${state.name}，${state.size}`;
-  const bits = [`最暗點 ${pct(an.p_black)}%`, plan.over ? `最亮點 ${pct(an.p_white)}%，收斂到 ${pct(plan.cap)}% 以下` : `最亮點 ${pct(an.p_white)}%`];
+  const bits = [`最暗點 ${pct(an.p_black)}%`, plan.over && an.p_white > plan.cap ? `最亮點 ${pct(an.p_white)}%，收斂到 ${pct(plan.cap)}% 以下` : `最亮點 ${pct(an.p_white)}%`];
   if (plan.bw) bits.push("黑白照片，只調明暗"); else { const up = plan.need.filter((g) => g > 1.03).length; if (up) bits.push(`${up} 個亮度帶補上顏色`); }
   $("labelFacts").textContent = bits.join("；") + "。";
 }
