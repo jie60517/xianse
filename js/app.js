@@ -146,7 +146,7 @@ const paint = (canvas, w, h, buf) => { canvas.width = w; canvas.height = h; canv
 window.__timing = {};                                        // last measured durations in ms, for diagnosis
 worker.onmessage = (ev) => {
   const m = ev.data;
-  if (m.timing) window.__timing.load = m.timing; if (m.ms !== undefined) window.__timing[m.type] = m.ms;
+  if (m.type === "loaded" && m.timing) window.__timing.load = m.timing; if (m.ms !== undefined) window.__timing[m.type] = m.ms;
   if (m.type === "loaded") {
     state.analysis = m.analysis; state.loaded = true;
     paint(before, m.pw, m.ph, m.original); paint(after, m.pw, m.ph, m.original.slice(0));
