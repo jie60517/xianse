@@ -28,13 +28,13 @@ export const STYLES = [
       ref_tc: [0.0159, 0.0235, 0.0353, 0.0474, 0.0561, 0.0639, 0.058, 0.051, 0.0393, 0.0179], key: 0.28, white_cap: 0.98, black_floor: 0.10,
       warm_hi: [-0.001, 0.004], warm_sh: [0.001, 0.008], hue: { green: -7, yellow_green: -6, yellow: -3, sky: -6, blue: -5, cyan: -2 } } },
   { id: "amber", name: "濃郁琥珀", note: "中間調偏橘黃，像夕陽或暖燈下", params: {
-      ref_tc: [0.0147, 0.0193, 0.0257, 0.0532, 0.0726, 0.0821, 0.0783, 0.0802, 0.0621, 0.0285], key: -0.28, white_cap: 0.93, max_colour_gain: 1.55,
+      ref_tc: [0.0147, 0.0193, 0.0257, 0.0532, 0.0726, 0.0821, 0.0783, 0.0802, 0.0621, 0.0285], key: -0.28, white_cap: 0.95, max_colour_gain: 1.55,
       warm_hi: [0.002, 0.008], warm_sh: [0.0045, 0.0045], hi_desat: 0.1, density: 0.17 } },
   { id: "warmlight", name: "暗底暖高光", note: "畫面壓暗，亮部保留暖色", params: {
-      ref_tc: [0.0196, 0.023, 0.0342, 0.0458, 0.0622, 0.0684, 0.0623, 0.0696, 0.0619, 0.0383], key: -0.3, white_cap: 0.92,
+      ref_tc: [0.0196, 0.023, 0.0342, 0.0458, 0.0622, 0.0684, 0.0623, 0.0696, 0.0619, 0.0383], key: -0.3, white_cap: 0.95,
       warm_hi: [0.002, 0.009], warm_sh: [0.0, 0.002], hi_desat: 0.08, density: 0.16 } },
   { id: "lowkey", name: "低調暗沉", note: "整體很暗，高光壓得最低", params: {
-      ref_tc: [0.0102, 0.0162, 0.0327, 0.0477, 0.0584, 0.0671, 0.0671, 0.0492, 0.0298, 0.0184], key: -0.45, white_cap: 0.90, black_floor: 0.06,
+      ref_tc: [0.0102, 0.0162, 0.0327, 0.0477, 0.0584, 0.0671, 0.0671, 0.0492, 0.0298, 0.0184], key: -0.45, white_cap: 0.94, black_floor: 0.06,
       warm_hi: [0.002, 0.005], warm_sh: [0.002, 0.005], density: 0.17 } },
   { id: "vivid", name: "高彩淺底", note: "顏色最濃、黑位抬高、對比最低", params: {
       ref_tc: [0.0138, 0.0319, 0.0466, 0.0699, 0.0886, 0.1006, 0.0881, 0.0708, 0.0533, 0.0369], max_colour_gain: 1.65, black_floor: 0.16, toe_keep: 0.7,
@@ -143,8 +143,12 @@ export function plan(an, strength, p = P) {
   const keep = clamp(1 - Math.hypot(an.cast[0], an.cast[1]) / 0.035, 0.25, 1.0) * Math.min(s, 1.25) / Math.max(s, 1e-6);
   // a photo that is mostly bright (snow, white rooms) keeps its whites closer to white
   const bright = (an.zone_share?.[8] || 0) + (an.zone_share?.[9] || 0);
-  const pull = Math.min(s, 1.6) * (1 - p.white_cap) * (1 - 0.6 * clamp((bright - 0.15) / 0.3, 0, 1));
-  return { lift, need, keep, over: an.p_white > p.knee, cap: 1 - pull, bw: an.bw, bright };
+  // pull: how far pure white is brought down. Never more than 0.08, whatever the style or strength.
+  const pull = Math.min(Math.min(s, 1.6) * (1 - p.white_cap) * (1 - 0.6 * clamp((bright - 0.15) / 0.3, 0, 1)), 0.08);
+  // The shoulder is L - pull * t^2 over [knee, 1]; its slope at white is 1 - 2 * pull / (1 - knee). Starting the
+  // shoulder early enough (span >= 4 * pull) keeps that slope >= 0.5, so tones can never fold back on themselves.
+  const knee = 1 - Math.max(1 - p.knee, 4 * pull);
+  return { lift, need, keep, over: an.p_white > knee, cap: 1 - pull, knee, bw: an.bw };
 }
 
 // Apply the look in place. Returns { analysis, plan }.
@@ -153,7 +157,7 @@ export function plan(an, strength, p = P) {
 export function render(rgba, w, h, strength = 1.5, opts = {}) {
   const p = opts.params || paramsFor(opts.style), s = strength;
   const an = opts.analysis || analyse(rgba, w, h); const pl = plan(an, s, p);
-  const [bt, bb, bl, br] = an.box; const { lift, need, keep, over, cap } = pl; const knee = p.knee, drop = 1 - cap, kspan = 1 - knee;
+  const [bt, bb, bl, br] = an.box; const { lift, need, keep, over, cap, knee } = pl; const drop = 1 - cap, kspan = 1 - knee;
   const contrast = s * p.mid_contrast * clamp(lift / 0.04, 0, 1);      // only to win back contrast lost to a lifted toe
   // hue tables: 12 soft colour families, interpolated per degree
   const hp = p.hue;
@@ -174,8 +178,8 @@ export function render(rgba, w, h, strength = 1.5, opts = {}) {
       let L1 = L + lift * (1 - ss(L, 0, 0.45));
       if (contrast > 0) { const u = (L1 - 0.5) / 0.5; L1 += contrast * (L1 - 0.5) * Math.max(1 - u * u, 0); }
       if (keyAmt !== 0) L1 += keyAmt * Math.sin(Math.PI * clamp(L1, 0, 1));      // style key: moves the mid-tones, leaves both ends in place
-      // shoulder: eases the very top down by `drop`, quadratically, so highlight texture keeps at least ~half its contrast
-      if (over && L1 > knee) { const t = Math.min((L1 - knee) / kspan, 1.2); L1 -= drop * t * t; }
+      // shoulder: eases the top down by `drop`, quadratically; plan() sizes the span so the slope stays >= 0.5
+      if (over && L1 > knee) { const t = Math.min((L1 - knee) / kspan, 1); L1 -= drop * t * t; }
       if (!pl.bw) {
         const C = Math.hypot(a, b); let h_ = Math.atan2(b, a) * R2D; if (h_ < 0) h_ += 360;
         // colour amount: fill this zone's shortfall; weak colours gain most, greys/strong colours/skin least
@@ -194,10 +198,11 @@ export function render(rgba, w, h, strength = 1.5, opts = {}) {
         const hi = h_ | 0, hf = h_ - hi, gate = ss(C1, 0.02, 0.06);
         const h1 = (h_ + s * gate * (DH[hi] + hf * (DH[hi + 1] - DH[hi]))) * D2R; L1 += s * gate * (DL[hi] + hf * (DL[hi + 1] - DL[hi]));
         // split tone relative to the photo's own balance
-        const wHi = ss(L1, 0.55, 0.85) * (1 - 0.85 * ss(L1, 0.88, 0.98)), wSh = 1 - ss(L1, 0.15, 0.5), k = s * keep;   // the cream tint fades out before white
+        const wHi = ss(L1, 0.55, 0.85) * (1 - 0.85 * ss(L1, 0.88, 0.98)), wSh = 1 - ss(L1, 0.15, 0.5), k = s * keep * (1 - 0.7 * skin);   // the cream tint fades out before white, and mostly spares skin
         a = C1 * Math.cos(h1) + k * (p.warm_hi[0] * wHi + p.warm_sh[0] * wSh); b = C1 * Math.sin(h1) + k * (p.warm_hi[1] * wHi + p.warm_sh[1] * wSh);
       }
-      // shadows are never pushed darker than they were: detail there is what keeps a photo from feeling heavy
+      // deep shadows (L < 0.18) are never pushed darker than they were, and the guard eases off by L 0.38:
+      // detail down there is what keeps a photo from feeling heavy
       if (L1 < L && L < 0.38) L1 += (L - L1) * (1 - ss(L, 0.18, 0.38));
       L1 = clamp(L1, 0, 1);
       const l3 = (L1 + 0.3963377774 * a + 0.2158037573 * b) ** 3, m3 = (L1 - 0.1055613458 * a - 0.0638541728 * b) ** 3, s3 = (L1 - 0.0894841775 * a - 1.291485548 * b) ** 3;
