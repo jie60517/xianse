@@ -36,7 +36,7 @@ function settings() {
 function requestPreview() {
   if (!state.loaded) return;
   if (state.busy) { state.pending = true; return; }          // keep only the newest request
-  state.busy = true;
+  state.busy = true; $("print").dataset.busy = "";
   worker.postMessage({ type: "preview", id: ++state.nextId, ...settings() });
 }
 const requestThumbs = () => state.loaded && worker.postMessage({ type: "thumbs", strength: +$("strength").value });
@@ -147,11 +147,11 @@ worker.onmessage = (ev) => {
     $("drop").hidden = true; $("print").hidden = false; $("another").hidden = false; $("download").disabled = false;
     state.size = `${m.w} × ${m.h}`;
     if (state.fxDefaults === null || !!m.effects !== !!state.fxDefaults) buildFxSliders(m.effects);
-    buildSheet(); state.pos = 50; fit(); say(""); requestPreview(); requestThumbs();
+    buildSheet(); state.pos = 100; state.reveal = true; fit(); say(""); requestPreview(); requestThumbs();
   } else if (m.type === "preview") {
     state.busy = false;
     if (m.id === state.nextId) { after.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.pw, m.ph), 0, 0); state.plan = m.plan; showReadout(); }
-    if (state.pending) { state.pending = false; requestPreview(); }
+    if (state.pending) { state.pending = false; requestPreview(); } else { delete $("print").dataset.busy; if (state.reveal) { state.reveal = false; curtain(); } }
   } else if (m.type === "thumbs") {
     for (const f of m.frames) { const c = document.querySelector(`.frame[data-style="${f.id}"] canvas`); if (c) paint(c, m.w, m.h, f.pixels); }
     fit();
@@ -161,10 +161,18 @@ worker.onmessage = (ev) => {
     const a = document.createElement("a"); a.href = URL.createObjectURL(m.blob); a.download = state.name.replace(/\.[^.]+$/, "") + "_顯色.jpg"; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000); $("download").disabled = false; say("已下載");
   } else if (m.type === "error") {
-    state.busy = false; $("download").disabled = !state.loaded;
+    state.busy = false; delete $("print").dataset.busy; $("download").disabled = !state.loaded;
     say(m.stage === "load" ? "這張照片讀不進來，檔案可能損毀或格式不支援。" : m.stage === "export" ? "輸出失敗，照片可能太大。請關掉其他分頁後再試一次。" : "處理失敗，請再調整一次或重新載入照片。");
     console.error(m);
   }
 };
 $("download").addEventListener("click", () => { $("download").disabled = true; say("輸出原尺寸中 0%"); worker.postMessage({ type: "export", ...settings() }); });
-function say(t) { $("status").textContent = t; }
+function say(t) { $("status").textContent = t; $("wallStatus").textContent = t; }
+
+// The one authored moment: when the first result is ready, the curtain draws back from the original to the middle.
+function curtain() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { setSplit(50); return; }
+  const t0 = performance.now(), dur = 900;
+  const step = (now) => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(2, -10 * k); setSplit(100 - 50 * (k === 1 ? 1 : e)); if (k < 1 && !dragging) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
