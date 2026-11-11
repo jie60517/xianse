@@ -133,12 +133,14 @@ export function analyse(rgba, w, h, box = contentBox(rgba, w, h)) {
   return { box, p_black: percentile(Ls, 0.5), p_white: percentile(Ls, 99.5), tc, tc_measured: raw, cast: [ea, eb], bw: percentile(Cs, 95) < 0.02, chroma: cAll / n, zone_share: Array.from(cnt, (c) => c / n) };
 }
 
+export const STANDARD_STRENGTH = 1.5;                 // the amount the look was tuned at; the interface shows it as 100
+
 // What the look will do to this photo at a given strength (shown in the interface, used by render).
 export function plan(an, strength, p = P) {
   const s = strength;
   // a photo that is mostly dark (night, a dim cabin) gets less of the lift: raising that much black reads as haze
   const dark = (an.zone_share?.[0] || 0) + (an.zone_share?.[1] || 0);
-  const lift = Math.min(s * p.toe_keep, 1) * Math.max(p.black_floor - an.p_black, 0) * (1 - 0.6 * clamp((dark - 0.35) / 0.35, 0, 1));   // never lifts past the floor itself
+  const lift = Math.min(s, STANDARD_STRENGTH) * p.toe_keep * Math.max(p.black_floor - an.p_black, 0) * (1 - 0.6 * clamp((dark - 0.35) / 0.35, 0, 1));   // stops growing at the standard strength
   // highlights (zones 8-9) may only gain a little colour: a faint cast in snow or a white wall is not "missing colour"
   const raw = p.ref_tc.map((r, i) => clamp(r / Math.max(an.tc[i], 0.003), p.min_colour_gain, i >= 8 ? Math.min(p.max_colour_gain, p.hi_gain_limit) : p.max_colour_gain));
   const need = raw.map((v, i) => 0.25 * raw[Math.max(i - 1, 0)] + 0.5 * v + 0.25 * raw[Math.min(i + 1, 9)]);
@@ -150,17 +152,19 @@ export function plan(an, strength, p = P) {
   // The shoulder is L - pull * t^2 over [knee, 1]; its slope at white is 1 - 2 * pull / (1 - knee). Starting the
   // shoulder early enough (span >= 4 * pull) keeps that slope >= 0.5, so tones can never fold back on themselves.
   const knee = 1 - Math.max(1 - p.knee, 4 * pull);
-  return { lift, need, keep, over: an.p_white > knee, cap: 1 - pull, knee, bw: an.bw };
+  // over: the shoulder is active. pulls: the photo's white point really ends up lower (what the interface reports).
+  return { lift, need, keep, over: an.p_white > knee, pulls: an.p_white > knee && an.p_white > 1 - pull, cap: 1 - pull, knee, bw: an.bw };
 }
 
 // Apply the look in place. Returns { analysis, plan }.
 // opts.offsetY / opts.fullH: rgba holds only rows offsetY .. offsetY+h of an image fullH rows tall
 // (used to split a large export across several workers); opts.analysis must then be given.
-export function render(rgba, w, h, strength = 1.5, opts = {}) {
+export function render(rgba, w, h, strength = STANDARD_STRENGTH, opts = {}) {
   const p = opts.params || paramsFor(opts.style), s = strength;
   const an = opts.analysis || analyse(rgba, w, h); const pl = plan(an, s, p);
   const [bt, bb, bl, br] = an.box; const { lift, need, keep, over, cap, knee } = pl; const drop = 1 - cap, kspan = 1 - knee;
-  const contrast = Math.min(s, 2) * p.mid_contrast * clamp(lift / 0.04, 0, 1);      // only to win back contrast lost to a lifted toe
+  const sCap = Math.min(s, 2);                          // contrast and hue moves stop growing here; colour amount goes on to 3
+  const contrast = sCap * p.mid_contrast * clamp(lift / 0.04, 0, 1);      // only to win back contrast lost to a lifted toe
   // hue tables: 12 soft colour families, interpolated per degree
   const hp = p.hue;
   const dh = [0, 0, 0, hp.yellow, hp.yellow_green, hp.green, hp.green * 0.5, hp.cyan, hp.sky, hp.blue, 0, 0];
@@ -198,8 +202,7 @@ export function render(rgba, w, h, strength = 1.5, opts = {}) {
         L1 -= dens * Math.max(C1 - 0.035, 0) * ss(L1, 0.25, 0.55) * (1 - 0.6 * ss(h_, 35, 60) * (1 - ss(h_, 75, 95)));
         // hue: olive greens, cyan-leaning blues, golden yellows
         const hi = h_ | 0, hf = h_ - hi, gate = ss(C1, 0.02, 0.06);
-        const sh = Math.min(s, 2);                                   // hue moves stop growing at twice the base amount
-        const h1 = (h_ + sh * gate * (DH[hi] + hf * (DH[hi + 1] - DH[hi]))) * D2R; L1 += sh * gate * (DL[hi] + hf * (DL[hi + 1] - DL[hi]));
+        const h1 = (h_ + sCap * gate * (DH[hi] + hf * (DH[hi + 1] - DH[hi]))) * D2R; L1 += sCap * gate * (DL[hi] + hf * (DL[hi + 1] - DL[hi]));
         // split tone relative to the photo's own balance
         const wHi = ss(L1, 0.55, 0.85) * (1 - 0.85 * ss(L1, 0.88, 0.98)), wSh = 1 - ss(L1, 0.15, 0.5), k = s * keep * (1 - 0.7 * skin * ss(C, 0.02, 0.05));   // the cream tint fades out before white, and mostly spares skin
         a = C1 * Math.cos(h1) + k * (p.warm_hi[0] * wHi + p.warm_sh[0] * wSh); b = C1 * Math.sin(h1) + k * (p.warm_hi[1] * wHi + p.warm_sh[1] * wSh);

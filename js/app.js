@@ -1,4 +1,4 @@
-import { STYLES, paramsFor } from "./look.js";
+import { STYLES, paramsFor, STANDARD_STRENGTH } from "./look.js";
 
 const $ = (id) => document.getElementById(id);
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
@@ -6,12 +6,12 @@ const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "modu
 const FX_LABELS = { grain: "顆粒", diffusion: "柔焦", halation: "高光紅暈", texture: "紋理", dust: "灰塵與刮痕", vignette: "暗角" };
 const state = { name: "", loaded: false, style: "classic", seed: 1, busy: false, pending: false, nextId: 0, fxDefaults: null, pos: 50, analysis: null, plan: null };
 const after = $("after"), before = $("before"), viewer = $("viewer"), easel = $("easel");
-const BORDER = 22;
-// The slider runs 0-200 with 100 as the standard amount; the engine's own scale has the standard at 1.5.
-const STRENGTH_UNIT = 0.015;
+const BORDER = 22;                                                           // white print border around the photo, px
+// The slider runs 0-200 with 100 as the standard amount; the engine has its own scale.
+const STRENGTH_UNIT = STANDARD_STRENGTH / 100;
 const strength = () => +$("strength").value * STRENGTH_UNIT;
 // Film-texture defaults that differ from the effects module's own: no soft-focus blur unless asked for.
-const FX_START = { diffusion: 0 };                                           // white print border around the photo, px
+const FX_START = { diffusion: 0 };
 
 // ---------- loading ----------
 function load(file) {
@@ -113,7 +113,7 @@ function showReadout() {
   const an = state.analysis, plan = state.plan; if (!an || !plan) return;
   const rows = [];
   rows.push(["最暗點", `<b>${pct(an.p_black)}%</b>　${plan.lift > 0.002 ? `稍微鬆開 <b>+${(plan.lift * 100).toFixed(1)}</b>` : "夠了，不動"}`]);
-  rows.push(["最亮點", `<b>${pct(an.p_white)}%</b>　${plan.over && an.p_white > plan.cap ? `收斂到 <b>${pct(plan.cap)}%</b> 以下` : "沒有過亮，不動"}`]);
+  rows.push(["最亮點", `<b>${pct(an.p_white)}%</b>　${plan.pulls ? `收斂到 <b>${pct(plan.cap)}%</b> 以下` : plan.over ? "亮部只稍微收一點" : "沒有過亮，不動"}`]);
   if (plan.bw) rows.push(["顏色", "黑白照片，只調明暗"]);
   else {
     const up = plan.need.filter((g) => g > 1.03).length, down = plan.need.filter((g) => g < 0.97).length;
@@ -138,7 +138,7 @@ function showReadout() {
   const st = STYLES.find((s) => s.id === state.style);
   $("labelTitle").innerHTML = `${st.name}<span>${st.note}</span>`;
   $("labelFile").textContent = `${state.name}，${state.size}`;
-  const bits = [`最暗點 ${pct(an.p_black)}%`, plan.over && an.p_white > plan.cap ? `最亮點 ${pct(an.p_white)}%，收斂到 ${pct(plan.cap)}% 以下` : `最亮點 ${pct(an.p_white)}%`];
+  const bits = [`最暗點 ${pct(an.p_black)}%`, plan.pulls ? `最亮點 ${pct(an.p_white)}%，收斂到 ${pct(plan.cap)}% 以下` : `最亮點 ${pct(an.p_white)}%`];
   if (plan.bw) bits.push("黑白照片，只調明暗"); else { const up = plan.need.filter((g) => g > 1.03).length; if (up) bits.push(`${up} 個亮度帶補上顏色`); }
   $("labelFacts").textContent = bits.join("；") + "。";
 }
