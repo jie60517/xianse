@@ -21,7 +21,7 @@ function fxParams(sliders, bw) {
   if (!fx || !sliders) return null;
   const p = {}; let any = false;
   for (const k of Object.keys(sliders)) if (k in fx.DEFAULTS) { p[k] = sliders[k]; if (sliders[k] > 0) any = true; }
-  if (bw && "halation" in p) p.halation = 0;       // the red glow has no place on a black-and-white photo
+  if (bw) { p.halation = 0; p.grain_chroma = 0; p.texture_color = 0; }   // no red glow, no coloured grain or mottle on a black-and-white photo
   return any ? p : null;
 }
 
