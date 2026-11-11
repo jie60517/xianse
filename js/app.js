@@ -6,7 +6,7 @@ const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "modu
 const FX_LABELS = { grain: "顆粒", diffusion: "柔焦", halation: "高光紅暈", texture: "紋理", dust: "灰塵與刮痕", vignette: "暗角" };
 const state = { name: "", loaded: false, style: "classic", seed: 1, busy: false, pending: false, nextId: 0, fxDefaults: null, pos: 50, analysis: null, plan: null };
 const after = $("after"), before = $("before"), viewer = $("viewer"), easel = $("easel");
-const BORDER = 22;                                                           // white print border around the photo, px
+const BORDER = 0;                                                            // border drawn inside the viewer around the photo, px
 // The slider runs 0-200 with 100 as the standard amount; the engine has its own scale.
 const STRENGTH_UNIT = STANDARD_STRENGTH / 100;
 const strength = () => +$("strength").value * STRENGTH_UNIT;
@@ -73,7 +73,7 @@ function buildSheet() {
   for (const st of STYLES) {
     const b = document.createElement("button"); b.type = "button"; b.className = "frame"; b.dataset.style = st.id; b.title = st.note;
     b.setAttribute("aria-pressed", String(st.id === state.style));
-    b.innerHTML = `<canvas></canvas><span>${st.name}</span>`;
+    b.innerHTML = `<canvas></canvas><span>${st.name}</span><span class="fid">${st.id.toUpperCase()}</span>`;
     b.addEventListener("click", () => { state.style = st.id; for (const o of sheet.children) o.setAttribute("aria-pressed", String(o === b)); requestPreview(); });
     b.addEventListener("keydown", (e) => {                   // arrow keys walk along the row
       const next = e.key === "ArrowRight" ? b.nextElementSibling : e.key === "ArrowLeft" ? b.previousElementSibling : null;
@@ -81,7 +81,7 @@ function buildSheet() {
     });
     sheet.append(b);
   }
-  sheet.hidden = false;
+  sheet.hidden = false; $("strip").hidden = false;
 }
 
 // ---------- compare slider ----------
@@ -100,7 +100,9 @@ $("split").addEventListener("keydown", (e) => { if (e.key === "ArrowLeft") setSp
 function fit() {                                            // show the whole print inside the easel
   if (!state.loaded) return;
   $("print").style.visibility = "hidden"; for (const c of [after, before]) c.style.width = c.style.height = "1px";
-  const r = easel.getBoundingClientRect(); const availW = r.width - 2 * BORDER - 8, availH = r.height - 2 * BORDER - 124;
+  const r = easel.getBoundingClientRect(), cs = getComputedStyle(easel);
+  const availW = r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2 * BORDER - 8;
+  const availH = r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 2 * BORDER - 96;   // room for the caption
   const sc = Math.max(0.05, Math.min(availW / after.width, availH / after.height, 1));
   for (const c of [after, before]) { c.style.width = Math.round(after.width * sc) + "px"; c.style.height = Math.round(after.height * sc) + "px"; }
   $("print").style.visibility = ""; setSplit(state.pos);
@@ -155,7 +157,7 @@ worker.onmessage = (ev) => {
   if (m.type === "loaded") {
     state.analysis = m.analysis; state.loaded = true;
     paint(before, m.pw, m.ph, m.original); paint(after, m.pw, m.ph, m.original.slice(0));
-    $("drop").hidden = true; $("print").hidden = false; $("another").hidden = false; $("download").disabled = false;
+    $("drop").hidden = true; $("print").hidden = false; $("another").hidden = false; $("peek").hidden = false; $("download").disabled = false;
     state.size = `${m.w} × ${m.h}`;
     if (state.fxDefaults === null || !!m.effects !== !!state.fxDefaults) buildFxSliders(m.effects);
     buildSheet(); state.pos = 100; state.reveal = true; fit(); say(""); requestPreview(); requestThumbs();
@@ -183,6 +185,16 @@ worker.onmessage = (ev) => {
   }
 };
 $("download").addEventListener("click", () => { $("download").disabled = true; say("輸出原尺寸中 0%"); worker.postMessage({ type: "export", ...settings() }); });
+// top bar: export mirrors the panel's download button; the eye shows the original while held
+$("exportTop").addEventListener("click", () => $("download").click());
+new MutationObserver(() => { $("exportTop").disabled = $("download").disabled; }).observe($("download"), { attributes: true, attributeFilter: ["disabled"] });
+let peekFrom = null;
+const peekOn = (e) => { if (!state.loaded || peekFrom !== null) return; e.preventDefault(); peekFrom = state.pos; setSplit(100); };
+const peekOff = () => { if (peekFrom === null) return; setSplit(peekFrom); peekFrom = null; };
+$("peek").addEventListener("pointerdown", peekOn);
+for (const ev of ["pointerup", "pointerleave", "pointercancel", "blur"]) $("peek").addEventListener(ev, peekOff);
+$("peek").addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") peekOn(e); });
+$("peek").addEventListener("keyup", peekOff);
 function say(t) { $("status").textContent = t; $("wallStatus").textContent = t; }
 
 // The one authored moment: when the first result is ready, the curtain draws back from the original to the middle.

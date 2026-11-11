@@ -7,29 +7,42 @@
 <meta name="description" content="先量測，再顯色。在瀏覽器裡替照片調出底片般的顏色，照片不會上傳。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Noto+Serif+TC:wght@400;600&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body data-wall="wall">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="M15 4.5v15"/><rect x="13.6" y="10.6" width="2.8" height="2.8" rx=".7" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-replace" viewBox="0 0 24 24"><rect x="4" y="4" width="12" height="12" rx="1.6" stroke-dasharray="2 2"/><rect x="8" y="8" width="12" height="12" rx="1.6"/></symbol>
+    <symbol id="i-preview" viewBox="0 0 24 24"><path d="M2.5 12s3.8-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.8 5.5-9.5 5.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 16V4M7.5 8.5 12 4l4.5 4.5M4 14.5v5h16v-5"/></symbol>
+    <symbol id="i-add" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
+  </defs>
+</svg>
+
 <div class="page">
+  <header class="top">
+    <div class="brand"><svg class="ic" aria-hidden="true"><use href="#i-mark"/></svg><h1>顯色</h1></div>
+    <div class="walls" role="radiogroup" aria-label="照片背後的底色">
+      <button type="button" role="radio" aria-checked="true" data-wall="wall" title="桌面灰"></button>
+      <button type="button" role="radio" aria-checked="false" data-wall="paper" title="紙白"></button>
+      <button type="button" role="radio" aria-checked="false" data-wall="dark" title="暗房"></button>
+    </div>
+    <div class="tools">
+      <button type="button" class="tool" id="another" title="換一張照片" aria-label="換一張照片" hidden><svg class="ic"><use href="#i-replace"/></svg></button>
+      <button type="button" class="tool" id="peek" title="按住看原圖" aria-label="按住看原圖" hidden><svg class="ic"><use href="#i-preview"/></svg></button>
+      <button type="button" class="tool" id="exportTop" title="下載照片" aria-label="下載照片" disabled><svg class="ic"><use href="#i-export"/></svg></button>
+    </div>
+  </header>
 
   <main class="wall" id="wall">
-    <header class="mast">
-      <h1>顯色</h1>
-      <p class="mast-line">先量測，再顯色</p>
-      <div class="walls" role="radiogroup" aria-label="照片背後的底色">
-        <button type="button" role="radio" aria-checked="true" data-wall="wall" title="展牆灰"></button>
-        <button type="button" role="radio" aria-checked="false" data-wall="paper" title="紙白"></button>
-        <button type="button" role="radio" aria-checked="false" data-wall="dark" title="暗房"></button>
-      </div>
-    </header>
-
     <section class="easel" id="easel">
       <label class="blank" id="drop">
         <input type="file" id="file" accept="image/jpeg,image/png,image/webp" hidden>
-        <span class="blank-print" aria-hidden="true"></span>
-        <span class="blank-title">掛上一張照片</span>
-        <span class="blank-sub">把照片拖到畫框裡，或點一下選檔。照片只在你的裝置上處理，不會上傳。</span>
+        <span class="blank-cell" aria-hidden="true"><svg class="ic"><use href="#i-add"/></svg></span>
+        <span class="blank-title">加入一張照片</span>
+        <span class="blank-sub">拖進來，或點一下選檔。照片只在你的裝置上處理，不會上傳。</span>
         <span class="wall-status" id="wallStatus" role="status"></span>
       </label>
 
@@ -37,26 +50,30 @@
         <div class="viewer" id="viewer">
           <canvas id="after"></canvas>
           <canvas id="before"></canvas>
+          <i class="h tl"></i><i class="h tr"></i><i class="h bl"></i><i class="h br"></i>
           <div class="split" id="split" role="slider" tabindex="0" aria-label="原圖與結果的分界" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><span></span></div>
           <span class="tag tag-l">原圖</span><span class="tag tag-r">結果</span>
         </div>
-        <figcaption class="label"><p class="label-title" id="labelTitle"></p><p id="labelFile"></p><p id="labelFacts"></p></figcaption>
+        <figcaption class="label"><p class="label-title" id="labelTitle"></p><p class="label-file" id="labelFile"></p><p id="labelFacts"></p></figcaption>
       </figure>
     </section>
 
-    <nav class="sheet" id="sheet" aria-label="風格" hidden></nav>
+    <div class="strip" id="strip" hidden>
+      <p class="kicker">風格<small>STYLES</small></p>
+      <nav class="sheet" id="sheet" aria-label="風格" hidden></nav>
+    </div>
   </main>
 
   <aside class="notes" aria-label="調整">
     <section class="note">
-      <div class="row"><h2>顏色強度</h2><output id="strengthOut">100</output></div>
+      <div class="row"><h2>顏色強度<small>STRENGTH</small></h2><output id="strengthOut">100</output></div>
       <input type="range" id="strength" min="0" max="200" step="5" value="100" aria-label="顏色強度">
       <p class="hint">100 是標準。0 是原圖的顏色，往右越強。</p>
     </section>
 
     <section class="note" id="fxGroup">
       <div class="row">
-        <h2><label class="check"><input type="checkbox" id="fxOn" checked>底片質感</label></h2>
+        <h2><label class="check"><input type="checkbox" id="fxOn" checked>底片質感<small>FILM</small></label></h2>
         <button type="button" class="link" id="reseed">換一組顆粒</button>
       </div>
       <div id="fxSliders"></div>
@@ -64,7 +81,7 @@
     </section>
 
     <details class="note readout" id="readout" hidden>
-      <summary><h2>這張照片的量測</h2></summary>
+      <summary><h2>這張照片的量測<small>READOUT</small></h2></summary>
       <dl id="facts"></dl>
       <div class="zones" id="zones" aria-label="各亮度帶的色彩量"></div>
       <p class="hint">由暗到亮十個亮度帶。色塊是這張照片的色彩量，白線是所選風格的水準，數字是實際調整的倍數。</p>
@@ -72,7 +89,6 @@
 
     <section class="note actions">
       <button type="button" class="primary" id="download" disabled>下載照片</button>
-      <button type="button" class="link" id="another" hidden>換一張照片</button>
       <p class="hint" id="status" role="status"></p>
     </section>
   </aside>
