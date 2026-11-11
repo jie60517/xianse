@@ -22,43 +22,42 @@ export const P = {
 const FAMILIES = ["pink", "red", "orange", "yellow", "yellow_green", "green", "teal", "cyan", "sky", "blue", "violet", "purple"];
 
 // Seven styles. Each is the same engine with targets taken from one group of reference photos (models/group_0X.json):
-// how much colour the group carries per lightness zone (ref_tc), where its whites and blacks sit, its overall key,
+// how much colour the group carries per lightness zone (ref_tc), where its blacks sit, its overall key,
 // the tint its shadows / mid-tones / highlights lean to (the group's "ta"/"tb"), and which colour families it turns
 // or keeps more or less of (the group's "fam"). "classic" is the broad house look (group 7).
 export const STYLES = [
   { id: "classic", name: "相紙", note: "最接近參考照片的整體樣貌", params: {} },
   // group 5: the least colour of all, mid-tones leaning slightly green rather than warm
   { id: "calm", name: "薄霧", note: "顏色收斂，中間調帶一點青綠", params: {
-      ref_tc: [0.0163, 0.0154, 0.024, 0.0358, 0.0417, 0.0441, 0.0405, 0.0352, 0.0285, 0.0167], min_colour_gain: 0.76, white_cap: 0.992,
+      ref_tc: [0.0163, 0.0154, 0.024, 0.0358, 0.0417, 0.0441, 0.0405, 0.0352, 0.0285, 0.0167], min_colour_gain: 0.76,
       warm_sh: [0.000, -0.005], warm_mid: [-0.011, 0.001], warm_hi: [-0.004, 0.003], hi_desat: 0.36, density: 0.11,
       hue: { green: -9, yellow_green: -5, yellow: -2, cyan: -6, sky: -6, blue: -7 }, sat: { pink: -0.22, red: -0.18, orange: -0.16, yellow: -0.14, yellow_green: -0.10, green: -0.08, teal: -0.06, cyan: -0.06, sky: -0.08, blue: -0.10, violet: -0.18, purple: -0.22 } } },
   // group 6: bright, yellow-warm shadows under clean highlights
   { id: "daylight", name: "正午", note: "整體提亮，暗部帶暖黃、亮部乾淨", params: {
-      ref_tc: [0.0159, 0.0235, 0.0353, 0.0474, 0.0561, 0.0639, 0.058, 0.051, 0.0393, 0.0179], key: 0.28, white_cap: 0.992, black_floor: 0.10,
+      ref_tc: [0.0159, 0.0235, 0.0353, 0.0474, 0.0561, 0.0639, 0.058, 0.051, 0.0393, 0.0179], key: 0.28, black_floor: 0.10,
       warm_sh: [0.006, 0.020], warm_mid: [0.001, 0.014], warm_hi: [-0.003, 0.004],
       hue: { green: -6, yellow_green: -5, yellow: -3, sky: -7, blue: -6, cyan: -2 }, sat: { yellow: 0.14, yellow_green: 0.12, green: 0.08, sky: 0.18, cyan: 0.10, blue: 0.06 } } },
   // group 2: golden highlights over neutral shadows, greens pulled to olive, blues held back
   { id: "amber", name: "琥珀", note: "亮部金黃、綠色偏橄欖、藍色收斂", params: {
-      ref_tc: [0.0147, 0.0193, 0.0257, 0.0532, 0.0726, 0.0821, 0.0783, 0.0802, 0.0621, 0.0285], key: -0.2, white_cap: 0.992, max_colour_gain: 1.55,
+      ref_tc: [0.0147, 0.0193, 0.0257, 0.0532, 0.0726, 0.0821, 0.0783, 0.0802, 0.0621, 0.0285], key: -0.2, max_colour_gain: 1.55,
       warm_sh: [-0.004, -0.002], warm_mid: [0.010, 0.015], warm_hi: [0.005, 0.020], hi_desat: 0.1, density: 0.17,
       hue: { yellow: -7, yellow_green: -9, green: -13, teal: -12, cyan: -12, sky: -4, blue: -2 },
       sat: { red: 0.10, orange: 0.20, yellow: 0.22, yellow_green: 0.06, cyan: -0.14, sky: -0.22, blue: -0.25, violet: -0.18 } } },
   // group 4: dark, red-brown shadows, warm highlights, greens muted
   { id: "warmlight", name: "燭火", note: "畫面壓暗，暗部偏紅褐、亮部暖", params: {
-      ref_tc: [0.0196, 0.023, 0.0342, 0.0458, 0.0622, 0.0684, 0.0623, 0.0696, 0.0619, 0.0383], key: -0.32, white_cap: 0.992,
+      ref_tc: [0.0196, 0.023, 0.0342, 0.0458, 0.0622, 0.0684, 0.0623, 0.0696, 0.0619, 0.0383], key: -0.32,
       warm_sh: [0.016, 0.010], warm_mid: [0.010, 0.013], warm_hi: [0.003, 0.014], hi_desat: 0.08, density: 0.16,
       hue: { yellow: -4, yellow_green: -5, green: -8, teal: -10, cyan: -14, sky: -5, blue: -3 },
       sat: { pink: 0.08, red: 0.18, orange: 0.12, yellow_green: -0.18, green: -0.26, teal: -0.24, cyan: -0.16, sky: -0.10, blue: -0.10 } } },
-  // group 1: the darkest, whites held lowest, cool colours drained
+  // group 1: the darkest, cool colours drained
   { id: "lowkey", name: "深夜", note: "整體最暗，冷色褪去、暗部偏藍", params: {
-      ref_tc: [0.0102, 0.0162, 0.0327, 0.0477, 0.0584, 0.0671, 0.0671, 0.0492, 0.0298, 0.0184], key: -0.45, white_cap: 0.992, black_floor: 0.06,
+      ref_tc: [0.0102, 0.0162, 0.0327, 0.0477, 0.0584, 0.0671, 0.0671, 0.0492, 0.0298, 0.0184], key: -0.45, black_floor: 0.06,
       warm_sh: [-0.002, -0.006], warm_mid: [0.004, 0.010], warm_hi: [0.004, 0.012], density: 0.17,
       hue: { green: -9, yellow_green: -6, yellow: -3, sky: -4, blue: -2, cyan: -3 },
       sat: { yellow_green: -0.12, green: -0.28, teal: -0.30, cyan: -0.30, sky: -0.30, blue: -0.30, violet: -0.24, purple: -0.14, pink: -0.08 } } },
   // group 3: the most colour, blacks lifted, shadows leaning teal
   { id: "vivid", name: "花期", note: "顏色最濃、黑位抬高、暗部帶青", params: {
-      ref_tc: [0.0138, 0.0319, 0.0466, 0.0699, 0.0886, 0.1006, 0.0881, 0.0708, 0.0533, 0.0369], max_colour_gain: 1.65, black_floor: 0.16, toe_keep: 0.7,
-      white_cap: 0.992, mid_contrast: 0.0, density: 0.10, warm_sh: [-0.008, -0.003], warm_mid: [0.006, 0.006], warm_hi: [0.002, 0.010],
+      ref_tc: [0.0138, 0.0319, 0.0466, 0.0699, 0.0886, 0.1006, 0.0881, 0.0708, 0.0533, 0.0369], max_colour_gain: 1.65, black_floor: 0.16, toe_keep: 0.7, mid_contrast: 0.0, density: 0.10, warm_sh: [-0.008, -0.003], warm_mid: [0.006, 0.006], warm_hi: [0.002, 0.010],
       hue: { green: -4, yellow_green: -3, yellow: -2, sky: -4, blue: -4, cyan: -3 },
       sat: { pink: 0.25, red: 0.22, orange: 0.18, yellow: 0.30, yellow_green: 0.30, green: 0.30, teal: 0.30, cyan: 0.34, sky: 0.30, blue: 0.20, violet: 0.20, purple: 0.25 } } },
 ];
