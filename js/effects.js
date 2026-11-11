@@ -454,7 +454,16 @@ function noiseField(salt, sigmaLow, fl, x0, y0, w, h, out) {
 }
 
 /** 1 / std of a field, measured on a 512 x 512 sample (effects.py also normalises empirically). */
+const NORM_CACHE = new Map();   // results depend only on (salt, sigma, factor); reused while a slider is dragged
 function fieldNorm(salt, sigmaLow, fl) {
+  const key = salt + "|" + sigmaLow + "|" + fl, hit = NORM_CACHE.get(key);
+  if (hit !== undefined) return hit;
+  const v = fieldNormCompute(salt, sigmaLow, fl);
+  if (NORM_CACHE.size > 64) NORM_CACHE.clear();
+  NORM_CACHE.set(key, v);
+  return v;
+}
+function fieldNormCompute(salt, sigmaLow, fl) {
   const n = 512, a = noiseField(salt, sigmaLow, fl, 0, 0, n, n, new Float32Array(n * n));
   let s = 0, s2 = 0;
   for (let i = 0; i < a.length; i++) { s += a[i]; s2 += a[i] * a[i]; }
@@ -531,6 +540,7 @@ function grain(img, p, seed) {
   }
 }
 
+const TEXTURE_CACHE = new Map();   // same seed, size and scale give the same mottle; only its strength changes
 function texture(img, p, seed) {
   const st = p.texture;
   if (st <= 0) return;
@@ -558,7 +568,14 @@ function texture(img, p, seed) {
     return t;
   };
   const amp = 0.04 * st;
-  const t1 = fractal(), t2 = color > 0 ? fractal() : null;
+  const tkey = seed + "|" + W + "|" + H + "|" + scale + "|" + (color > 0 ? 1 : 0);
+  let cached = TEXTURE_CACHE.get(tkey);
+  if (!cached) {
+    cached = { t1: fractal(), t2: color > 0 ? fractal() : null };
+    if (TEXTURE_CACHE.size > 6) TEXTURE_CACHE.clear();
+    TEXTURE_CACHE.set(tkey, cached);
+  }
+  const { t1, t2 } = cached;
   const cvec = [1.0, 0.1, -0.9];   // slight warm/cool drift, like uneven base density
   [R, G, B].forEach((C, c) => {
     const fac = new Float32Array(n);

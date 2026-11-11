@@ -141,6 +141,8 @@ export function plan(an, strength, p = P) {
 }
 
 // Apply the look in place. Returns { analysis, plan }.
+// opts.offsetY / opts.fullH: rgba holds only rows offsetY .. offsetY+h of an image fullH rows tall
+// (used to split a large export across several workers); opts.analysis must then be given.
 export function render(rgba, w, h, strength = 1.5, opts = {}) {
   const p = opts.params || paramsFor(opts.style), s = strength;
   const an = opts.analysis || analyse(rgba, w, h); const pl = plan(an, s, p);
@@ -154,7 +156,8 @@ export function render(rgba, w, h, strength = 1.5, opts = {}) {
   const NEED = new Float32Array(1025); for (let i = 0; i <= 1024; i++) NEED[i] = interp(i / 1024, LC, need);
   const keyAmt = p.key * 0.12 * Math.min(s, 1.6);
   const dens = Math.min(s, 1.7) * p.density, R2D = 180 / Math.PI, D2R = Math.PI / 180;
-  for (let y = bt; y < h - bb; y++) {
+  const offY = opts.offsetY || 0, fullH = opts.fullH || h;
+  for (let y = Math.max(0, bt - offY); y < Math.min(h, fullH - bb - offY); y++) {
     for (let x = bl; x < w - br; x++) {
       const o = (y * w + x) * 4; const lr = LIN[rgba[o]], lg = LIN[rgba[o + 1]], lb = LIN[rgba[o + 2]];
       const l_ = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb), m_ = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb), s_ = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);

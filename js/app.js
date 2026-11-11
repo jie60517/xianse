@@ -33,15 +33,17 @@ function settings() {
   if (state.fxDefaults) for (const k of Object.keys(FX_LABELS)) { const el = $("fx_" + k); if (el) fx[k] = $("fxOn").checked ? +el.value : 0; }
   return { strength: +$("strength").value, style: state.style, fx: state.fxDefaults ? fx : null, seed: state.seed };
 }
-function requestPreview() {
+// draft = true while a slider is being dragged: a small, fast render that keeps up with the hand.
+// The full-size preview follows when the slider is released.
+function requestPreview(draft = false) {
   if (!state.loaded) return;
-  if (state.busy) { state.pending = true; return; }          // keep only the newest request
-  state.busy = true; $("print").dataset.busy = "";
-  worker.postMessage({ type: "preview", id: ++state.nextId, ...settings() });
+  if (state.busy) { state.pending = state.pending === "full" || !draft ? "full" : "draft"; return; }   // keep only the newest request
+  state.busy = true; if (!draft) $("print").dataset.busy = "";
+  worker.postMessage({ type: "preview", id: ++state.nextId, draft, ...settings() });
 }
 const requestThumbs = () => state.loaded && worker.postMessage({ type: "thumbs", strength: +$("strength").value });
-$("strength").addEventListener("input", (e) => { $("strengthOut").textContent = String(+(+e.target.value).toFixed(2)); requestPreview(); });
-$("strength").addEventListener("change", requestThumbs);
+$("strength").addEventListener("input", (e) => { $("strengthOut").textContent = String(+(+e.target.value).toFixed(2)); requestPreview(true); });
+$("strength").addEventListener("change", () => { requestPreview(); requestThumbs(); });
 $("fxOn").addEventListener("change", () => { $("fxGroup").classList.toggle("fx-off", !$("fxOn").checked); requestPreview(); });
 $("reseed").addEventListener("click", () => { state.seed = (state.seed * 7919 + 13) % 100000; requestPreview(); });
 
@@ -55,7 +57,8 @@ function buildFxSliders(defaults) {
     row.innerHTML = `<div class="row"><label for="fx_${k}">${label}</label><output id="fxo_${k}"></output></div><input type="range" id="fx_${k}" min="0" max="1" step="0.05">`;
     box.append(row); const el = row.querySelector("input"), out = row.querySelector("output");
     el.value = defaults[k]; out.textContent = (+el.value).toFixed(2); trackFill(el);
-    el.addEventListener("input", () => { out.textContent = (+el.value).toFixed(2); requestPreview(); });
+    el.addEventListener("input", () => { out.textContent = (+el.value).toFixed(2); requestPreview(true); });
+    el.addEventListener("change", () => requestPreview());
   }
 }
 
@@ -138,9 +141,12 @@ for (const el of document.querySelectorAll("input[type=range]")) trackFill(el);
 function trackFill(el) { const f = () => el.style.setProperty("--fill", ((el.value - el.min) / (el.max - el.min)) * 100 + "%"); el.addEventListener("input", f); f(); }
 
 // ---------- worker replies ----------
+const scratch = document.createElement("canvas");            // holds a draft render before it is scaled up
 const paint = (canvas, w, h, buf) => { canvas.width = w; canvas.height = h; canvas.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(buf), w, h), 0, 0); };
+window.__timing = {};                                        // last measured durations in ms, for diagnosis
 worker.onmessage = (ev) => {
   const m = ev.data;
+  if (m.timing) window.__timing.load = m.timing; if (m.ms !== undefined) window.__timing[m.type] = m.ms;
   if (m.type === "loaded") {
     state.analysis = m.analysis; state.loaded = true;
     paint(before, m.pw, m.ph, m.original); paint(after, m.pw, m.ph, m.original.slice(0));
@@ -150,8 +156,13 @@ worker.onmessage = (ev) => {
     buildSheet(); state.pos = 100; state.reveal = true; fit(); say(""); requestPreview(); requestThumbs();
   } else if (m.type === "preview") {
     state.busy = false;
-    if (m.id === state.nextId) { after.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.pw, m.ph), 0, 0); state.plan = m.plan; showReadout(); }
-    if (state.pending) { state.pending = false; requestPreview(); } else { delete $("print").dataset.busy; if (state.reveal) { state.reveal = false; curtain(); } }
+    if (m.id === state.nextId) {
+      const img = new ImageData(new Uint8ClampedArray(m.pixels), m.pw, m.ph), g = after.getContext("2d");
+      if (m.draft) { scratch.width = m.pw; scratch.height = m.ph; scratch.getContext("2d").putImageData(img, 0, 0); g.imageSmoothingQuality = "high"; g.drawImage(scratch, 0, 0, after.width, after.height); }
+      else g.putImageData(img, 0, 0);
+      state.plan = m.plan; showReadout();
+    }
+    if (state.pending) { const d = state.pending === "draft"; state.pending = false; requestPreview(d); } else { delete $("print").dataset.busy; if (state.reveal) { state.reveal = false; curtain(); } }
   } else if (m.type === "thumbs") {
     for (const f of m.frames) { const c = document.querySelector(`.frame[data-style="${f.id}"] canvas`); if (c) paint(c, m.w, m.h, f.pixels); }
     fit();
@@ -159,7 +170,7 @@ worker.onmessage = (ev) => {
     say(`輸出原尺寸中 ${Math.round(m.t * 100)}%`);
   } else if (m.type === "exported") {
     const a = document.createElement("a"); a.href = URL.createObjectURL(m.blob); a.download = state.name.replace(/\.[^.]+$/, "") + "_顯色.jpg"; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000); $("download").disabled = false; say("已下載");
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000); $("download").disabled = false; say("已下載"); window.__timing.export = m.timing;
   } else if (m.type === "error") {
     state.busy = false; delete $("print").dataset.busy; $("download").disabled = !state.loaded;
     say(m.stage === "load" ? "這張照片讀不進來，檔案可能損毀或格式不支援。" : m.stage === "export" ? "輸出失敗，照片可能太大。請關掉其他分頁後再試一次。" : "處理失敗，請再調整一次或重新載入照片。");
