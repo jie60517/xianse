@@ -4,64 +4,76 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>顯色</title>
+<meta name="description" content="先量測，再顯色。在瀏覽器裡替照片調出底片般的顏色，照片不會上傳。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Noto+Serif+TC:wght@400;600&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 </head>
-<body>
-<div class="app">
-  <section class="bench" aria-label="照片">
-    <header class="rebate rebate-top">
-      <span class="mark">顯色</span>
-      <span class="rebate-note" id="fileNote">先量測，再調色</span>
-      <span class="rebate-right" id="sizeNote"></span>
+<body data-wall="wall">
+<div class="page">
+
+  <main class="wall" id="wall">
+    <header class="mast">
+      <h1>顯色</h1>
+      <p class="mast-line">先量測，再顯色</p>
+      <div class="walls" role="radiogroup" aria-label="照片背後的底色">
+        <button type="button" role="radio" aria-checked="true" data-wall="wall" title="展牆灰"></button>
+        <button type="button" role="radio" aria-checked="false" data-wall="paper" title="紙白"></button>
+        <button type="button" role="radio" aria-checked="false" data-wall="dark" title="暗房"></button>
+      </div>
     </header>
 
-    <div class="stage" id="stage">
-      <label class="drop" id="drop">
+    <section class="easel" id="easel">
+      <label class="blank" id="drop">
         <input type="file" id="file" accept="image/jpeg,image/png,image/webp" hidden>
-        <span class="drop-title">把照片拖進來，或點這裡選檔</span>
-        <span class="drop-sub">JPEG、PNG、WebP。照片只在這台電腦上處理，不會上傳。</span>
+        <span class="blank-print" aria-hidden="true"></span>
+        <span class="blank-title">掛上一張照片</span>
+        <span class="blank-sub">把照片拖到畫框裡，或點一下選檔。照片只在你的裝置上處理，不會上傳。</span>
       </label>
 
-      <div class="viewer" id="viewer" hidden>
-        <canvas id="after"></canvas>
-        <canvas id="before"></canvas>
-        <div class="split" id="split" role="slider" tabindex="0" aria-label="原圖與結果的分界" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><span></span></div>
-        <span class="tag tag-l">原圖</span><span class="tag tag-r">結果</span>
-        <div class="busy" id="busy" hidden>處理中</div>
-      </div>
-    </div>
+      <figure class="print" id="print" hidden>
+        <div class="viewer" id="viewer">
+          <canvas id="after"></canvas>
+          <canvas id="before"></canvas>
+          <div class="split" id="split" role="slider" tabindex="0" aria-label="原圖與結果的分界" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><span></span></div>
+          <span class="tag tag-l">原圖</span><span class="tag tag-r">結果</span>
+        </div>
+        <figcaption class="label"><p class="label-title" id="labelTitle"></p><p id="labelFile"></p><p id="labelFacts"></p></figcaption>
+      </figure>
+    </section>
 
-    <footer class="rebate rebate-bottom" id="strip" aria-label="各亮度帶的色彩量"></footer>
-  </section>
+    <nav class="sheet" id="sheet" aria-label="風格" hidden></nav>
+  </main>
 
-  <aside class="panel" aria-label="調整">
-    <div class="group">
+  <aside class="notes" aria-label="調整">
+    <section class="note">
+      <div class="row"><h2>顏色強度</h2><output id="strengthOut">1.5</output></div>
+      <input type="range" id="strength" min="0" max="2" step="0.05" value="1.5" aria-label="顏色強度">
+      <p class="hint">建議 1.5。超過 1.8 顏色會開始變重。</p>
+    </section>
+
+    <section class="note" id="fxGroup">
       <div class="row">
-        <label for="strength">顏色強度</label><output id="strengthOut">1.5</output>
-      </div>
-      <input type="range" id="strength" min="0" max="2" step="0.05" value="1.5">
-      <p class="hint">1.5 是建議值。超過 1.8 顏色會開始變重。</p>
-    </div>
-
-    <div class="group" id="fxGroup">
-      <div class="row">
-        <label class="check"><input type="checkbox" id="fxOn" checked> 底片質感</label>
-        <button type="button" class="ghost" id="reseed">換一組顆粒</button>
+        <h2><label class="check"><input type="checkbox" id="fxOn" checked>底片質感</label></h2>
+        <button type="button" class="link" id="reseed">換一組顆粒</button>
       </div>
       <div id="fxSliders"></div>
-      <p class="hint" id="fxMissing" hidden>底片質感模組尚未載入，目前只處理顏色。</p>
-    </div>
+      <p class="hint" id="fxMissing" hidden>底片質感尚未載入，目前只處理顏色。</p>
+    </section>
 
-    <div class="group readout" id="readout" hidden>
-      <h2>這張照片的量測</h2>
+    <details class="note readout" id="readout" hidden>
+      <summary><h2>這張照片的量測</h2></summary>
       <dl id="facts"></dl>
-    </div>
+      <div class="zones" id="zones" aria-label="各亮度帶的色彩量"></div>
+      <p class="hint">由暗到亮十個亮度帶。色塊是這張照片的色彩量，白線是所選風格的水準，數字是實際調整的倍數。</p>
+    </details>
 
-    <div class="group actions">
-      <button type="button" class="primary" id="download" disabled>下載 JPEG</button>
-      <button type="button" class="ghost" id="another" hidden>換一張照片</button>
+    <section class="note actions">
+      <button type="button" class="primary" id="download" disabled>下載照片</button>
+      <button type="button" class="link" id="another" hidden>換一張照片</button>
       <p class="hint" id="status" role="status"></p>
-    </div>
+    </section>
   </aside>
 </div>
 <script type="module" src="js/app.js"></script>

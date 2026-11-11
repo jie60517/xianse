@@ -7,10 +7,37 @@ export const REF_TC = [0.01615, 0.01613, 0.02587, 0.04061, 0.051, 0.05651, 0.055
 const LC = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95];
 
 export const P = {
+  ref_tc: REF_TC, min_colour_gain: 1.0, key: 0,
   white_cap: 0.925, knee: 0.74, black_floor: 0.085, toe_keep: 0.55, density: 0.22, shadow_colour: 0.85, max_colour_gain: 1.55,
   hi_desat: 0.30, warm_hi: [0.0035, 0.0085], warm_sh: [0.003, 0.005], mid_contrast: 0.06,
   hue: { green: -7.0, yellow_green: -5.0, yellow: -3.0, sky: -5.0, blue: -4.0, cyan: -2.0 }, green_dark: 0.02, blue_dark: 0.02,
 };
+
+// Seven styles. Each is the same engine with targets taken from one group of reference photos:
+// how much colour that group carries per lightness zone (ref_tc), where its whites and blacks sit,
+// its overall key, and the tint of its highlights and shadows. "classic" is the broad house look.
+export const STYLES = [
+  { id: "classic", name: "經典", note: "最接近參考照片的整體樣貌", params: {} },
+  { id: "calm", name: "冷靜低彩", note: "顏色收斂、接近中性", params: {
+      ref_tc: [0.0163, 0.0154, 0.024, 0.0358, 0.0417, 0.0441, 0.0405, 0.0352, 0.0285, 0.0167], min_colour_gain: 0.82, white_cap: 0.91,
+      warm_hi: [0.0005, 0.0045], warm_sh: [-0.001, 0.001], hi_desat: 0.36, density: 0.17 } },
+  { id: "daylight", name: "明亮日光", note: "整體提亮，暗部帶暖、亮部乾淨", params: {
+      ref_tc: [0.0159, 0.0235, 0.0353, 0.0474, 0.0561, 0.0639, 0.058, 0.051, 0.0393, 0.0179], key: 0.28, white_cap: 0.93, black_floor: 0.10,
+      warm_hi: [-0.001, 0.004], warm_sh: [0.001, 0.008], hue: { green: -7, yellow_green: -6, yellow: -3, sky: -6, blue: -5, cyan: -2 } } },
+  { id: "amber", name: "濃郁琥珀", note: "中間調偏橘黃，像夕陽或暖燈下", params: {
+      ref_tc: [0.0147, 0.0193, 0.0257, 0.0532, 0.0726, 0.0821, 0.0783, 0.0802, 0.0621, 0.0285], key: -0.28, white_cap: 0.875, max_colour_gain: 1.7,
+      warm_hi: [0.0025, 0.0115], warm_sh: [0.0045, 0.0045], hi_desat: 0.1, density: 0.25 } },
+  { id: "warmlight", name: "暗底暖高光", note: "畫面壓暗，亮部保留暖色", params: {
+      ref_tc: [0.0196, 0.023, 0.0342, 0.0458, 0.0622, 0.0684, 0.0623, 0.0696, 0.0619, 0.0383], key: -0.3, white_cap: 0.865,
+      warm_hi: [0.002, 0.0135], warm_sh: [0.0, 0.002], hi_desat: 0.08, density: 0.24 } },
+  { id: "lowkey", name: "低調暗沉", note: "整體很暗，高光壓得最低", params: {
+      ref_tc: [0.0102, 0.0162, 0.0327, 0.0477, 0.0584, 0.0671, 0.0671, 0.0492, 0.0298, 0.0184], key: -0.45, white_cap: 0.84, black_floor: 0.06,
+      warm_hi: [0.0025, 0.008], warm_sh: [0.002, 0.005], density: 0.26 } },
+  { id: "vivid", name: "高彩淺底", note: "顏色最濃、黑位抬高、對比最低", params: {
+      ref_tc: [0.0138, 0.0319, 0.0466, 0.0699, 0.0886, 0.1006, 0.0881, 0.0708, 0.0533, 0.0369], max_colour_gain: 1.8, black_floor: 0.16, toe_keep: 0.7,
+      white_cap: 0.89, mid_contrast: 0.0, density: 0.15, warm_hi: [0.002, 0.010], warm_sh: [-0.002, 0.004] } },
+];
+export const paramsFor = (id) => ({ ...P, ...(STYLES.find((s) => s.id === id) || STYLES[0]).params });
 
 const LIN = new Float32Array(256);
 for (let i = 0; i < 256; i++) { const c = i / 255; LIN[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
@@ -107,7 +134,7 @@ export function analyse(rgba, w, h, box = contentBox(rgba, w, h)) {
 export function plan(an, strength, p = P) {
   const s = strength;
   const lift = s * p.toe_keep * Math.max(p.black_floor - an.p_black, 0);
-  const raw = REF_TC.map((r, i) => clamp(r / Math.max(an.tc[i], 0.003), 1.0, p.max_colour_gain));
+  const raw = p.ref_tc.map((r, i) => clamp(r / Math.max(an.tc[i], 0.003), p.min_colour_gain, p.max_colour_gain));
   const need = raw.map((v, i) => 0.25 * raw[Math.max(i - 1, 0)] + 0.5 * v + 0.25 * raw[Math.min(i + 1, 9)]);
   const keep = clamp(1 - Math.hypot(an.cast[0], an.cast[1]) / 0.035, 0.25, 1.0) * Math.min(s, 1.25) / Math.max(s, 1e-6);
   return { lift, need, keep, over: an.p_white > p.knee, cap: p.white_cap + (1 - s) * (1 - p.white_cap), bw: an.bw };
@@ -115,7 +142,7 @@ export function plan(an, strength, p = P) {
 
 // Apply the look in place. Returns { analysis, plan }.
 export function render(rgba, w, h, strength = 1.5, opts = {}) {
-  const p = opts.params || P, s = strength;
+  const p = opts.params || paramsFor(opts.style), s = strength;
   const an = opts.analysis || analyse(rgba, w, h); const pl = plan(an, s, p);
   const [bt, bb, bl, br] = an.box; const { lift, need, keep, over, cap } = pl; const knee = p.knee, span = cap - knee;
   // hue tables: 12 soft colour families, interpolated per degree
@@ -125,6 +152,7 @@ export function render(rgba, w, h, strength = 1.5, opts = {}) {
   const DH = new Float32Array(362), DL = new Float32Array(362);
   for (let d = 0; d <= 361; d++) { let a = 0, b = 0; for (let f = 0; f < 12; f++) { const dist = Math.abs(((d - f * 30 + 180) % 360 + 360) % 360 - 180); const wt = Math.max(0, 1 - dist / 30); a += wt * dh[f]; b += wt * dl[f]; } DH[d] = a; DL[d] = b; }
   const NEED = new Float32Array(1025); for (let i = 0; i <= 1024; i++) NEED[i] = interp(i / 1024, LC, need);
+  const keyAmt = p.key * 0.12 * Math.min(s, 1.6);
   const dens = Math.min(s, 1.7) * p.density, R2D = 180 / Math.PI, D2R = Math.PI / 180;
   for (let y = bt; y < h - bb; y++) {
     for (let x = bl; x < w - br; x++) {
@@ -134,14 +162,19 @@ export function render(rgba, w, h, strength = 1.5, opts = {}) {
       // tone: toe only as far as needed, a little mid contrast, shoulder below white
       let L1 = L + lift * (1 - ss(L, 0, 0.45));
       const u = (L1 - 0.5) / 0.5; L1 += s * p.mid_contrast * (L1 - 0.5) * Math.max(1 - u * u, 0);
+      if (keyAmt !== 0) L1 += keyAmt * Math.sin(Math.PI * clamp(L1, 0, 1));      // style key: moves the mid-tones, leaves both ends in place
       if (over && L1 > knee) L1 = knee + span * Math.tanh(((L1 - knee) / span) * 0.95);
       if (!pl.bw) {
         const C = Math.hypot(a, b); let h_ = Math.atan2(b, a) * R2D; if (h_ < 0) h_ += 360;
         // colour amount: fill this zone's shortfall; weak colours gain most, greys/strong colours/skin least
         let gain = 1 + s * p.shadow_colour * (NEED[(clamp(L1, 0, 1) * 1024) | 0] - 1);
-        gain = 1 + (gain - 1) * (1 - ss(C, 0.07, 0.16)) * ss(C, 0.004, 0.02);
         const skin = ss(h_, 12, 32) * (1 - ss(h_, 78, 95));
-        gain = 1 + (gain - 1) * (1 - 0.65 * skin); gain = Math.min(gain, 1.0 + 0.7 * (1 - 0.6 * skin));
+        if (gain >= 1) {
+          gain = 1 + (gain - 1) * (1 - ss(C, 0.07, 0.16)) * ss(C, 0.004, 0.02);
+          gain = 1 + (gain - 1) * (1 - 0.65 * skin); gain = Math.min(gain, 1.0 + 0.7 * (1 - 0.6 * skin));
+        } else {
+          gain = 1 + (gain - 1) * (1 - 0.5 * skin);                               // a quieter style takes colour off everything, skin a little less
+        }
         let C1 = C * gain * (1 - s * p.hi_desat * ss(L1, 0.8, 0.97));
         L1 -= dens * Math.max(C1 - 0.035, 0) * ss(L1, 0.12, 0.45) * (1 - 0.6 * ss(h_, 35, 60) * (1 - ss(h_, 75, 95)));
         // hue: olive greens, cyan-leaning blues, golden yellows
