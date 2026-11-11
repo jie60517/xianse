@@ -1,0 +1,92 @@
+/* 顯色 - the photo sits on a neutral mid-grey, as on a viewing booth, so the surround does not
+   bias how its colours read. Everything else stays dark and quiet. Amber = darkroom safelight. */
+:root {
+  --surround: #6f6f6d;   /* viewing grey */
+  --bench: #262625;
+  --panel: #1c1c1b;
+  --ink: #ece9e1;
+  --dim: #a3a098;
+  --line: #3b3a37;
+  --amber: #e3a63c;
+  --ref: #86c9c0;
+  --mono: "Cascadia Mono", "Consolas", "SFMono-Regular", "Menlo", monospace;
+  --sans: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--panel); color: var(--ink); font: 15px/1.55 var(--sans); }
+
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 340px; height: 100vh; }
+.bench { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; height: 100vh; overflow: hidden; background: var(--bench); }
+
+/* film-rebate strips: the edge of the frame, where the stock prints its own notes */
+.rebate { display: flex; align-items: center; gap: 18px; padding: 0 18px; min-height: 40px; background: #121211; color: var(--amber); font: 12px/1 var(--mono); letter-spacing: .12em; white-space: nowrap; overflow: hidden; }
+.rebate .mark { font: 600 15px/1 var(--sans); letter-spacing: .5em; }
+.rebate-note { color: #b98b3a; overflow: hidden; text-overflow: ellipsis; }
+.rebate-right { margin-left: auto; color: #b98b3a; }
+
+.stage { position: relative; display: grid; place-items: center; min-height: 0; padding: 22px; background: var(--surround); overflow: hidden; }
+.drop { display: grid; gap: 10px; place-items: center; text-align: center; width: min(560px, 100%); padding: 56px 28px; border: 1.5px dashed #2a2a29; border-radius: 4px; color: #1b1b1a; cursor: pointer; }
+.drop:hover, .drop.over, .drop:focus-within { background: rgba(0, 0, 0, .08); border-color: #111; }
+.drop-title { font-size: 20px; font-weight: 600; letter-spacing: .04em; }
+.drop-sub { font-size: 13px; color: #2c2c2b; }
+
+.viewer { position: relative; line-height: 0; touch-action: none; user-select: none; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); }
+.viewer canvas { display: block; max-width: 100%; }
+.viewer #before { position: absolute; inset: 0; width: 100%; height: 100%; clip-path: inset(0 50% 0 0); }
+.split { position: absolute; top: 0; bottom: 0; left: 50%; width: 28px; margin-left: -14px; cursor: ew-resize; outline: none; }
+.split::before { content: ""; position: absolute; top: 0; bottom: 0; left: 13px; width: 2px; background: var(--amber); }
+.split span { position: absolute; top: 50%; left: 2px; width: 24px; height: 24px; margin-top: -12px; border-radius: 50%; background: var(--amber); box-shadow: 0 1px 6px rgba(0, 0, 0, .5); }
+.split:focus-visible span { box-shadow: 0 0 0 3px #111, 0 0 0 5px var(--amber); }
+.tag { position: absolute; top: 10px; padding: 5px 8px; background: rgba(18, 18, 17, .78); color: var(--ink); font: 12px/1 var(--sans); letter-spacing: .1em; pointer-events: none; }
+.tag-l { left: 10px; } .tag-r { right: 10px; }
+.busy { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 7px 12px; background: rgba(18, 18, 17, .85); color: var(--amber); font: 12px/1 var(--mono); letter-spacing: .14em; }
+
+/* bottom rebate doubles as a control strip: ten lightness zones, how much colour the photo has in each */
+.rebate-bottom { min-height: 74px; padding: 8px 18px; gap: 6px; align-items: stretch; letter-spacing: 0; }
+.zone { flex: 1 1 0; display: grid; grid-template-rows: 1fr auto; gap: 4px; min-width: 0; }
+.zone-bar { position: relative; border-radius: 2px; overflow: hidden; }
+.zone-have { position: absolute; left: 0; bottom: 0; width: 100%; background: var(--amber); opacity: .9; }
+.zone-ref { position: absolute; left: 0; width: 100%; height: 2px; background: var(--ref); }
+.zone-gain { font: 11px/1 var(--mono); color: var(--dim); text-align: center; }
+.zone-gain.on { color: var(--amber); }
+.strip-key { display: grid; align-content: center; gap: 6px; padding-right: 10px; font: 11px/1.2 var(--sans); color: var(--dim); white-space: normal; max-width: 150px; }
+.strip-key i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; }
+.strip-key .k-have { background: var(--amber); } .strip-key .k-ref { height: 2px; background: var(--ref); vertical-align: 3px; }
+
+.panel { overflow-y: auto; padding: 8px 22px 28px; border-left: 1px solid var(--line); }
+.group { padding: 18px 0; border-bottom: 1px solid var(--line); }
+.group:last-child { border-bottom: 0; }
+.row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+label { font-size: 14px; }
+output { font: 14px/1 var(--mono); color: var(--amber); }
+.hint { margin: 8px 0 0; font-size: 12.5px; color: var(--dim); }
+h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; letter-spacing: .06em; }
+
+input[type=range] { width: 100%; margin: 10px 0 0; accent-color: var(--amber); }
+.fx-row { margin-top: 12px; }
+.fx-row .row label { color: var(--ink); font-size: 13.5px; }
+.fx-off .fx-row { opacity: .35; }
+.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.check input { accent-color: var(--amber); width: 16px; height: 16px; }
+
+dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+dt { color: var(--dim); } dd { margin: 0; }
+dd b { font: 13px/1 var(--mono); font-weight: 400; color: var(--amber); }
+
+button { font: inherit; cursor: pointer; border-radius: 3px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.primary { width: 100%; padding: 13px 16px; border: 0; background: var(--amber); color: #17130a; font-weight: 600; letter-spacing: .08em; }
+.primary:disabled { background: #4a4333; color: #8d8672; cursor: default; }
+.ghost { padding: 6px 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-size: 13px; }
+.ghost:hover { border-color: var(--amber); color: var(--amber); }
+.actions .ghost { width: 100%; margin-top: 10px; padding: 10px; }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
+  .bench { height: 72vh; }
+  .panel { border-left: 0; border-top: 1px solid var(--line); }
+  .strip-key { display: none; }
+}
+@media (prefers-reduced-motion: no-preference) { .drop { transition: background .15s, border-color .15s; } }
