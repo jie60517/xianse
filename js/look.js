@@ -8,9 +8,9 @@ const LC = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95];
 
 export const P = {
   ref_tc: REF_TC, min_colour_gain: 1.0, key: 0,
-  // white_cap: where pure white ends up at strength 1 (0.97 = barely below white). The earlier 0.925 with a hard
-  // shoulder turned snow and white walls grey and flattened their texture.
-  white_cap: 0.97, knee: 0.80, black_floor: 0.085, toe_keep: 0.55, density: 0.14, shadow_colour: 0.6, max_colour_gain: 1.4,
+  // white_cap: where pure white ends up at strength 1. Kept within about 1% of white for every style: anything
+  // lower (0.925 at first, then 0.94-0.97) read as grey on snow, white walls and paper.
+  white_cap: 0.992, knee: 0.80, black_floor: 0.085, toe_keep: 0.55, density: 0.14, shadow_colour: 0.6, max_colour_gain: 1.4,
   hi_gain_limit: 1.12, skin_gain_limit: 1.12,
   // tints are [a, b] in OKLab (a: green- / red+, b: blue- / yellow+) for shadows, mid-tones and highlights
   hi_desat: 0.30, warm_hi: [0.002, 0.008], warm_mid: [0.003, 0.009], warm_sh: [0.002, 0.006], mid_contrast: 0.06,
@@ -29,36 +29,36 @@ export const STYLES = [
   { id: "classic", name: "相紙", note: "最接近參考照片的整體樣貌", params: {} },
   // group 5: the least colour of all, mid-tones leaning slightly green rather than warm
   { id: "calm", name: "薄霧", note: "顏色收斂，中間調帶一點青綠", params: {
-      ref_tc: [0.0163, 0.0154, 0.024, 0.0358, 0.0417, 0.0441, 0.0405, 0.0352, 0.0285, 0.0167], min_colour_gain: 0.76, white_cap: 0.96,
+      ref_tc: [0.0163, 0.0154, 0.024, 0.0358, 0.0417, 0.0441, 0.0405, 0.0352, 0.0285, 0.0167], min_colour_gain: 0.76, white_cap: 0.992,
       warm_sh: [0.000, -0.005], warm_mid: [-0.011, 0.001], warm_hi: [-0.004, 0.003], hi_desat: 0.36, density: 0.11,
       hue: { green: -9, yellow_green: -5, yellow: -2, cyan: -6, sky: -6, blue: -7 }, sat: { pink: -0.22, red: -0.18, orange: -0.16, yellow: -0.14, yellow_green: -0.10, green: -0.08, teal: -0.06, cyan: -0.06, sky: -0.08, blue: -0.10, violet: -0.18, purple: -0.22 } } },
   // group 6: bright, yellow-warm shadows under clean highlights
   { id: "daylight", name: "正午", note: "整體提亮，暗部帶暖黃、亮部乾淨", params: {
-      ref_tc: [0.0159, 0.0235, 0.0353, 0.0474, 0.0561, 0.0639, 0.058, 0.051, 0.0393, 0.0179], key: 0.28, white_cap: 0.98, black_floor: 0.10,
+      ref_tc: [0.0159, 0.0235, 0.0353, 0.0474, 0.0561, 0.0639, 0.058, 0.051, 0.0393, 0.0179], key: 0.28, white_cap: 0.992, black_floor: 0.10,
       warm_sh: [0.006, 0.020], warm_mid: [0.001, 0.014], warm_hi: [-0.003, 0.004],
       hue: { green: -6, yellow_green: -5, yellow: -3, sky: -7, blue: -6, cyan: -2 }, sat: { yellow: 0.14, yellow_green: 0.12, green: 0.08, sky: 0.18, cyan: 0.10, blue: 0.06 } } },
   // group 2: golden highlights over neutral shadows, greens pulled to olive, blues held back
   { id: "amber", name: "琥珀", note: "亮部金黃、綠色偏橄欖、藍色收斂", params: {
-      ref_tc: [0.0147, 0.0193, 0.0257, 0.0532, 0.0726, 0.0821, 0.0783, 0.0802, 0.0621, 0.0285], key: -0.2, white_cap: 0.95, max_colour_gain: 1.55,
+      ref_tc: [0.0147, 0.0193, 0.0257, 0.0532, 0.0726, 0.0821, 0.0783, 0.0802, 0.0621, 0.0285], key: -0.2, white_cap: 0.992, max_colour_gain: 1.55,
       warm_sh: [-0.004, -0.002], warm_mid: [0.010, 0.015], warm_hi: [0.005, 0.020], hi_desat: 0.1, density: 0.17,
       hue: { yellow: -7, yellow_green: -9, green: -13, teal: -12, cyan: -12, sky: -4, blue: -2 },
       sat: { red: 0.10, orange: 0.20, yellow: 0.22, yellow_green: 0.06, cyan: -0.14, sky: -0.22, blue: -0.25, violet: -0.18 } } },
   // group 4: dark, red-brown shadows, warm highlights, greens muted
   { id: "warmlight", name: "燭火", note: "畫面壓暗，暗部偏紅褐、亮部暖", params: {
-      ref_tc: [0.0196, 0.023, 0.0342, 0.0458, 0.0622, 0.0684, 0.0623, 0.0696, 0.0619, 0.0383], key: -0.32, white_cap: 0.95,
+      ref_tc: [0.0196, 0.023, 0.0342, 0.0458, 0.0622, 0.0684, 0.0623, 0.0696, 0.0619, 0.0383], key: -0.32, white_cap: 0.992,
       warm_sh: [0.016, 0.010], warm_mid: [0.010, 0.013], warm_hi: [0.003, 0.014], hi_desat: 0.08, density: 0.16,
       hue: { yellow: -4, yellow_green: -5, green: -8, teal: -10, cyan: -14, sky: -5, blue: -3 },
       sat: { pink: 0.08, red: 0.18, orange: 0.12, yellow_green: -0.18, green: -0.26, teal: -0.24, cyan: -0.16, sky: -0.10, blue: -0.10 } } },
   // group 1: the darkest, whites held lowest, cool colours drained
-  { id: "lowkey", name: "深夜", note: "整體很暗，高光壓得最低，冷色褪去、暗部偏藍", params: {
-      ref_tc: [0.0102, 0.0162, 0.0327, 0.0477, 0.0584, 0.0671, 0.0671, 0.0492, 0.0298, 0.0184], key: -0.45, white_cap: 0.94, black_floor: 0.06,
+  { id: "lowkey", name: "深夜", note: "整體最暗，冷色褪去、暗部偏藍", params: {
+      ref_tc: [0.0102, 0.0162, 0.0327, 0.0477, 0.0584, 0.0671, 0.0671, 0.0492, 0.0298, 0.0184], key: -0.45, white_cap: 0.992, black_floor: 0.06,
       warm_sh: [-0.002, -0.006], warm_mid: [0.004, 0.010], warm_hi: [0.004, 0.012], density: 0.17,
       hue: { green: -9, yellow_green: -6, yellow: -3, sky: -4, blue: -2, cyan: -3 },
       sat: { yellow_green: -0.12, green: -0.28, teal: -0.30, cyan: -0.30, sky: -0.30, blue: -0.30, violet: -0.24, purple: -0.14, pink: -0.08 } } },
   // group 3: the most colour, blacks lifted, shadows leaning teal
   { id: "vivid", name: "花期", note: "顏色最濃、黑位抬高、暗部帶青", params: {
       ref_tc: [0.0138, 0.0319, 0.0466, 0.0699, 0.0886, 0.1006, 0.0881, 0.0708, 0.0533, 0.0369], max_colour_gain: 1.65, black_floor: 0.16, toe_keep: 0.7,
-      white_cap: 0.95, mid_contrast: 0.0, density: 0.10, warm_sh: [-0.008, -0.003], warm_mid: [0.006, 0.006], warm_hi: [0.002, 0.010],
+      white_cap: 0.992, mid_contrast: 0.0, density: 0.10, warm_sh: [-0.008, -0.003], warm_mid: [0.006, 0.006], warm_hi: [0.002, 0.010],
       hue: { green: -4, yellow_green: -3, yellow: -2, sky: -4, blue: -4, cyan: -3 },
       sat: { pink: 0.25, red: 0.22, orange: 0.18, yellow: 0.30, yellow_green: 0.30, green: 0.30, teal: 0.30, cyan: 0.34, sky: 0.30, blue: 0.20, violet: 0.20, purple: 0.25 } } },
 ];
@@ -207,7 +207,7 @@ export function render(rgba, w, h, strength = STANDARD_STRENGTH, opts = {}) {
       // tone: toe only as far as needed, a little mid contrast, shoulder below white
       let L1 = L + lift * (1 - ss(L, 0, 0.45));
       if (contrast > 0) { const u = (L1 - 0.5) / 0.5; L1 += contrast * (L1 - 0.5) * Math.max(1 - u * u, 0); }
-      if (keyAmt !== 0) L1 += keyAmt * Math.sin(Math.PI * clamp(L1, 0, 1));      // style key: moves the mid-tones, leaves both ends in place
+      if (keyAmt !== 0) L1 += keyAmt * Math.sin(Math.PI * clamp(L1, 0, 1)) * (keyAmt < 0 ? 1 - ss(L1, 0.7, 0.95) : 1);   // style key: moves the mid-tones, leaves both ends in place; a darker key leaves the highlights alone, or whites turn grey
       // shoulder: eases the top down by `drop`, quadratically; plan() sizes the span so the slope stays >= 0.5
       if (over && L1 > knee) { const t = Math.min((L1 - knee) / kspan, 1); L1 -= drop * t * t; }
       if (!pl.bw) {
